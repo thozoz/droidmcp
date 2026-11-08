@@ -89,7 +89,7 @@ func (t *tools) register(s *sdk.Server, enableShell bool) {
 	sdk.AddTool(s, &sdk.Tool{Name: "list_apps", Annotations: ro, Description: "List launchable apps with their labels and package names."}, t.listApps)
 	sdk.AddTool(s, &sdk.Tool{Name: "current_app", Annotations: ro, Description: "Report the foreground package and activity."}, t.currentApp)
 	sdk.AddTool(s, &sdk.Tool{Name: "wait_for", Annotations: ro,
-		Description: "Wait. With text or ref: poll the UI until a matching node appears (returns a fresh ref), or with gone:true until it disappears. With neither: just wait timeout_ms without reading the screen. Use it to stay on a task instead of ending your turn." + coordNote}, t.waitFor)
+		Description: "Wait. With text or ref: poll the UI until a matching node appears (returns a fresh ref), or with gone:true until it disappears. With neither: just wait timeout_ms without reading the screen. Use it to stay on a task instead of ending your turn. Polling reads the screen every 500 ms and each read is a new snapshot, so refs from before the wait go stale (snapshot numbers jump); call ui_tree after it. The plain wait reads nothing and keeps refs valid." + coordNote}, t.waitFor)
 	if enableShell {
 		sdk.AddTool(s, &sdk.Tool{Name: "shell", Description: "Run a shell command as the shell user (uid 2000)."}, t.shell)
 	}
