@@ -80,8 +80,8 @@ func (t *tools) register(s *sdk.Server, enableShell bool) {
 	sdk.AddTool(s, &sdk.Tool{Name: "scroll", Description: "Scroll a scrollable node, or the whole screen." + coordNote}, t.scroll)
 	sdk.AddTool(s, &sdk.Tool{Name: "type_text", Description: "Type text into a field (ref) or the focused field; appends to existing text. The exec fallback backend accepts printable ASCII only."}, t.typeText)
 	sdk.AddTool(s, &sdk.Tool{Name: "key", Description: "Press a system key."}, t.key)
-	sdk.AddTool(s, &sdk.Tool{Name: "open_app", Description: "Launch an app by package or label."}, t.openApp)
-	sdk.AddTool(s, &sdk.Tool{Name: "list_apps", Annotations: ro, Description: "List installed third-party packages."}, t.listApps)
+	sdk.AddTool(s, &sdk.Tool{Name: "open_app", Description: "Launch an app by package name or app label."}, t.openApp)
+	sdk.AddTool(s, &sdk.Tool{Name: "list_apps", Annotations: ro, Description: "List launchable apps with their labels and package names."}, t.listApps)
 	sdk.AddTool(s, &sdk.Tool{Name: "current_app", Annotations: ro, Description: "Report the foreground package and activity."}, t.currentApp)
 	sdk.AddTool(s, &sdk.Tool{Name: "wait_for", Annotations: ro,
 		Description: "Poll the UI until a node with the text (or the node an old ref pointed at) appears. Returns a fresh ref." + coordNote}, t.waitFor)
@@ -376,7 +376,11 @@ func (t *tools) listApps(ctx context.Context, _ *sdk.CallToolRequest, _ noIn) (*
 	}
 	var b strings.Builder
 	for _, a := range apps {
-		b.WriteString(a.Package + "\n")
+		if a.Label != "" {
+			b.WriteString(fmt.Sprintf("%s (%s)\n", a.Label, a.Package))
+		} else {
+			b.WriteString(a.Package + "\n")
+		}
 	}
 	return text(b.String()), nil, nil
 }

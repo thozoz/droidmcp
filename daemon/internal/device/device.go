@@ -93,6 +93,7 @@ func (n Node) Signature() string {
 type App struct {
 	Package  string
 	Activity string // empty when unknown
+	Label    string // display label from launcher; empty when unknown
 }
 
 type Key string

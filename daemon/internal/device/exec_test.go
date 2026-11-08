@@ -143,7 +143,7 @@ func TestParsers(t *testing.T) {
 	}
 
 	act := "  topResumedActivity=ActivityRecord{1a2b u0 com.android.settings/.Settings t42}\n"
-	if a, ok := parseResumedActivity(act); !ok || a != (App{"com.android.settings", ".Settings"}) {
+	if a, ok := parseResumedActivity(act); !ok || a != (App{Package: "com.android.settings", Activity: ".Settings"}) {
 		t.Errorf("resumed = %+v %v", a, ok)
 	}
 	old := "    mResumedActivity: ActivityRecord{1a2b u0 com.whatsapp/.HomeActivity t7}"

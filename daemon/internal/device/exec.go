@@ -189,6 +189,10 @@ func (e *Exec) OpenApp(ctx context.Context, pkgOrLabel string) error {
 			return fmt.Errorf("%q is ambiguous: %s", pkgOrLabel, strings.Join(matches, ", "))
 		}
 	}
+	return e.openPackage(ctx, pkg)
+}
+
+func (e *Exec) openPackage(ctx context.Context, pkg string) error {
 	// /system/bin/monkey has no #! line, so exec fails with ENOEXEC; hand the
 	// script to sh as a file argument (still argv, no -c).
 	out, errOut, err := e.run(ctx, "sh", "/system/bin/monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")

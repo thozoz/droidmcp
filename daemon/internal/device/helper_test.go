@@ -37,6 +37,13 @@ func (f *fakeSpawner) spawn(context.Context) (io.ReadWriteCloser, func(), error)
 			}
 			_ = json.Unmarshal(p, &req)
 			resp := map[string]any{"id": req.ID, "ok": true}
+			if req.Op == "apps" {
+				resp["result"] = map[string]any{
+					"apps": []map[string]string{
+						{"package": "com.android.settings", "activity": ".Settings", "label": "Settings"},
+					},
+				}
+			}
 			switch f.behave(n, req.Op) {
 			case "die":
 				return
@@ -142,5 +149,18 @@ func TestBaseAPK(t *testing.T) {
 	}
 	if _, ok := baseAPK(""); ok {
 		t.Error("empty output must not resolve")
+	}
+}
+
+func TestHelperListApps(t *testing.T) {
+	now := time.Unix(0, 0)
+	f := &fakeSpawner{behave: func(int, string) string { return "ok" }}
+	h := newTestHelper(f, &now)
+	apps, err := h.ListApps(context.Background())
+	if err != nil {
+		t.Fatalf("ListApps: %v", err)
+	}
+	if len(apps) != 1 || apps[0].Package != "com.android.settings" || apps[0].Label != "Settings" {
+		t.Errorf("apps = %+v", apps)
 	}
 }

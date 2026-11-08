@@ -277,6 +277,38 @@ func (h *Helper) SetNodeText(ctx context.Context, ref, text string) error {
 	return err
 }
 
+type wireApp struct {
+	Package  string `json:"package"`
+	Activity string `json:"activity"`
+	Label    string `json:"label"`
+}
+
+func (h *Helper) ListApps(ctx context.Context) ([]App, error) {
+	var res struct {
+		Apps []wireApp `json:"apps"`
+	}
+	if _, err := h.call(ctx, "apps", nil, &res); err != nil {
+		return nil, err
+	}
+	apps := make([]App, len(res.Apps))
+	for i, a := range res.Apps {
+		apps[i] = App{Package: a.Package, Activity: a.Activity, Label: a.Label}
+	}
+	return apps, nil
+}
+
+func (h *Helper) OpenApp(ctx context.Context, pkgOrLabel string) error {
+	apps, err := h.ListApps(ctx)
+	if err != nil {
+		return err
+	}
+	matched, err := MatchApp(apps, pkgOrLabel)
+	if err != nil {
+		return err
+	}
+	return h.openPackage(ctx, matched.Package)
+}
+
 // baseAPK picks the base APK from `pm path` output (split APKs add more lines).
 func baseAPK(out string) (string, bool) {
 	var first string
