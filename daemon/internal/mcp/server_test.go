@@ -23,12 +23,16 @@ type fakeDevice struct {
 	mu           sync.Mutex
 	taps         [][2]int
 	displayCalls int
+	trees        int
 }
 
 func (f *fakeDevice) Screenshot(context.Context, device.ScreenshotOpts) (device.Screenshot, error) {
 	return device.Screenshot{Data: []byte{0xFF, 0xD8}, MIME: "image/jpeg", Display: testDisplay}, nil
 }
 func (f *fakeDevice) UITree(context.Context, bool) ([]device.Node, device.DisplayInfo, error) {
+	f.mu.Lock()
+	f.trees++
+	f.mu.Unlock()
 	return testNodes(), testDisplay, nil
 }
 func (f *fakeDevice) Display(context.Context) (device.DisplayInfo, error) {
@@ -272,5 +276,34 @@ func TestWaitForModes(t *testing.T) {
 	start := time.Now()
 	if out, isErr := call(t, cs, "wait_for", map[string]any{"timeout_ms": 200}); isErr || !strings.HasPrefix(out, "waited") || time.Since(start) < 200*time.Millisecond {
 		t.Errorf("plain wait: isErr=%v %q after %v", isErr, out, time.Since(start))
+	}
+}
+
+// A client that drops the HTTP request must stop wait_for's polling: the
+// stateless SDK would otherwise keep the tool running until its timeout.
+func TestWaitForStopsWhenRequestEnds(t *testing.T) {
+	dev := &fakeDevice{}
+	url := newTestServer(t, dev)
+	ctx, cancel := context.WithTimeout(context.Background(), 700*time.Millisecond)
+	defer cancel()
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"wait_for","arguments":{"text":"absent","timeout_ms":10000}}}`
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, url, strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer tok")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("Mcp-Protocol-Version", "2025-11-25")
+	if resp, err := http.DefaultClient.Do(req); err == nil {
+		resp.Body.Close()
+	}
+	time.Sleep(300 * time.Millisecond) // let the cancel land
+	dev.mu.Lock()
+	before := dev.trees
+	dev.mu.Unlock()
+	time.Sleep(1200 * time.Millisecond) // more than two poll intervals
+	dev.mu.Lock()
+	after := dev.trees
+	dev.mu.Unlock()
+	if before == 0 || after != before {
+		t.Fatalf("ui_tree polls: %d then %d; wait_for kept polling after the request ended", before, after)
 	}
 }

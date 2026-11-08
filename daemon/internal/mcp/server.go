@@ -64,10 +64,10 @@ type HandlerOptions struct {
 func NewHandler(srv *sdk.Server, o HandlerOptions) http.Handler {
 	token, shutdown, rotated := o.Token, o.Shutdown, o.Rotated
 	mux := http.NewServeMux()
-	var mcpH http.Handler = sdk.NewStreamableHTTPHandler(
+	var mcpH http.Handler = trackRequests(sdk.NewStreamableHTTPHandler(
 		func(*http.Request) *sdk.Server { return srv },
 		&sdk.StreamableHTTPOptions{Stateless: true, Logger: o.Logger},
-	)
+	))
 	if o.Clients != nil {
 		// Only MCP traffic counts: the app's own /health, /clients polling must not.
 		mcpH = o.Clients.Middleware(mcpH)

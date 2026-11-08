@@ -407,7 +407,9 @@ func (t *tools) currentApp(ctx context.Context, _ *sdk.CallToolRequest, _ noIn) 
 	return text(a.Package + "/" + a.Activity), nil, nil
 }
 
-func (t *tools) waitFor(ctx context.Context, _ *sdk.CallToolRequest, in waitForIn) (*sdk.CallToolResult, any, error) {
+func (t *tools) waitFor(ctx context.Context, req *sdk.CallToolRequest, in waitForIn) (*sdk.CallToolResult, any, error) {
+	ctx, done := withRequest(ctx, req) // a client that gives up stops the polling
+	defer done()
 	var match func(device.Node) bool
 	switch {
 	case in.Ref != "":
