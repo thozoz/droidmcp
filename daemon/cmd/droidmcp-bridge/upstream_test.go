@@ -37,7 +37,7 @@ func newFakeDaemon(t *testing.T) *fakeDaemon {
 		f.mu.Lock()
 		tok := f.token
 		f.mu.Unlock()
-		auth.Middleware(tok, mcpH).ServeHTTP(w, r)
+		auth.Middleware(auth.NewTokenValue(tok), mcpH).ServeHTTP(w, r)
 	}))
 	t.Cleanup(f.srv.Close)
 	return f

@@ -3,6 +3,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -47,10 +48,12 @@ func (t *tools) primeDisplay(logger *slog.Logger) {
 	t.state.setDisplay(d)
 }
 
-// NewHandler serves /mcp, /health and /shutdown, all behind the bearer token.
-// The MCP handler is stateless: no per-session state exists, so both
-// session-based (2025-11-25) and sessionless (2026-07-28) clients work.
-func NewHandler(token string, srv *sdk.Server, shutdown func(), logger *slog.Logger) http.Handler {
+// NewHandler serves /mcp, /health, /shutdown and /token, all behind the
+// bearer token. The MCP handler is stateless: no per-session state exists,
+// so both session-based (2025-11-25) and sessionless (2026-07-28) clients
+// work. POST /token replaces the token and returns the new one; rotated is
+// called with it (to persist it) before the response is sent.
+func NewHandler(token *auth.Token, srv *sdk.Server, shutdown func(), rotated func(string), logger *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", sdk.NewStreamableHTTPHandler(
 		func(*http.Request) *sdk.Server { return srv },
@@ -66,6 +69,19 @@ func NewHandler(token string, srv *sdk.Server, shutdown func(), logger *slog.Log
 		if shutdown != nil {
 			go shutdown()
 		}
+	})
+	mux.HandleFunc("POST /token", func(w http.ResponseWriter, r *http.Request) {
+		t, err := auth.NewToken()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		token.Set(t)
+		if rotated != nil {
+			rotated(t)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = fmt.Fprintf(w, `{"token":%q}`, t)
 	})
 	return auth.Middleware(token, mux)
 }

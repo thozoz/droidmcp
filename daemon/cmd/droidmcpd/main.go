@@ -52,12 +52,19 @@ func run() error {
 		}
 		*token = t
 	}
-	if *tokenFile != "" {
+	// The token file is how the bridge (via adb) finds the current token.
+	writeToken := func(t string) {
+		if *tokenFile == "" {
+			return
+		}
 		_ = os.Remove(*tokenFile) // WriteFile keeps an existing file's mode
-		if err := os.WriteFile(*tokenFile, []byte(*token+"\n"), 0o600); err != nil {
-			return fmt.Errorf("write token: %w", err)
+		if err := os.WriteFile(*tokenFile, []byte(t+"\n"), 0o600); err != nil {
+			logger.Error("write token", "err", err)
 		}
 	}
+	writeToken(*token)
+	// The SDK logs every stateless request at INFO; keep only its warnings.
+	sdkLogger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelWarn}))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -69,11 +76,11 @@ func run() error {
 		dev = h
 	}
 	srv := mcp.NewServer(dev, mcp.Options{
-		MaxEdge: *maxEdge, EnableShell: *enableShell, Version: version, Logger: logger,
+		MaxEdge: *maxEdge, EnableShell: *enableShell, Version: version, Logger: sdkLogger,
 	})
 	httpSrv := &http.Server{
 		Addr:              *addr,
-		Handler:           mcp.NewHandler(*token, srv, stop, logger),
+		Handler:           mcp.NewHandler(auth.NewTokenValue(*token), srv, stop, writeToken, sdkLogger),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

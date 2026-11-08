@@ -31,7 +31,7 @@ func TestMiddleware(t *testing.T) {
 				req.Header.Set("Authorization", tt.header)
 			}
 			rec := httptest.NewRecorder()
-			Middleware(tt.token, ok).ServeHTTP(rec, req)
+			Middleware(NewTokenValue(tt.token), ok).ServeHTTP(rec, req)
 			if rec.Code != tt.want {
 				t.Fatalf("status = %d, want %d", rec.Code, tt.want)
 			}

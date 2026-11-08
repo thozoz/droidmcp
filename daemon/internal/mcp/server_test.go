@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/thozoz/droidmcp/daemon/internal/auth"
 	"github.com/thozoz/droidmcp/daemon/internal/device"
 )
 
@@ -90,7 +92,7 @@ func call(t *testing.T, cs *sdk.ClientSession, name string, args map[string]any)
 
 func newTestServer(t *testing.T, dev *fakeDevice) string {
 	t.Helper()
-	ts := httptest.NewServer(NewHandler("tok", NewServer(dev, Options{MaxEdge: 1080}), nil, nil))
+	ts := httptest.NewServer(NewHandler(auth.NewTokenValue("tok"), NewServer(dev, Options{MaxEdge: 1080}), nil, nil, nil))
 	t.Cleanup(ts.Close)
 	return ts.URL + "/mcp"
 }
@@ -153,7 +155,7 @@ func TestShellToolGated(t *testing.T) {
 }
 
 func TestHandlerRequiresToken(t *testing.T) {
-	ts := httptest.NewServer(NewHandler("tok", NewServer(&fakeDevice{}, Options{}), nil, nil))
+	ts := httptest.NewServer(NewHandler(auth.NewTokenValue("tok"), NewServer(&fakeDevice{}, Options{}), nil, nil, nil))
 	defer ts.Close()
 	for _, p := range []string{"/mcp", "/health"} {
 		resp, err := http.Get(ts.URL + p)
@@ -164,5 +166,35 @@ func TestHandlerRequiresToken(t *testing.T) {
 		if resp.StatusCode != http.StatusUnauthorized {
 			t.Errorf("%s without token: %d", p, resp.StatusCode)
 		}
+	}
+}
+
+func TestTokenRotation(t *testing.T) {
+	var saved string
+	ts := httptest.NewServer(NewHandler(auth.NewTokenValue("old"), NewServer(&fakeDevice{}, Options{}), nil,
+		func(tok string) { saved = tok }, nil))
+	defer ts.Close()
+	do := func(method, path, tok string) (int, string) {
+		req, _ := http.NewRequest(method, ts.URL+path, nil)
+		req.Header.Set("Authorization", "Bearer "+tok)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var body struct{ Token string }
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		return resp.StatusCode, body.Token
+	}
+
+	code, fresh := do(http.MethodPost, "/token", "old")
+	if code != http.StatusOK || len(fresh) != 64 || saved != fresh {
+		t.Fatalf("rotate: code=%d token=%q saved=%q", code, fresh, saved)
+	}
+	if code, _ := do(http.MethodGet, "/health", "old"); code != http.StatusUnauthorized {
+		t.Errorf("old token after rotation: %d", code)
+	}
+	if code, _ := do(http.MethodGet, "/health", fresh); code != http.StatusOK {
+		t.Errorf("new token: %d", code)
 	}
 }
