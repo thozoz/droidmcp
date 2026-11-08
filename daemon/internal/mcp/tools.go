@@ -51,6 +51,7 @@ type (
 		Ref     string `json:"ref,omitempty" jsonschema:"field to tap first"`
 		Replace bool   `json:"replace,omitempty" jsonschema:"replace existing text instead of appending (empty text clears the field)"`
 		Submit  bool   `json:"submit,omitempty" jsonschema:"automatically submit/send after typing (presses send button, IME action or enter)"`
+		Send    bool   `json:"send,omitempty" jsonschema:"alias for submit; automatically presses send button or enter after typing"`
 	}
 	keyIn struct {
 		Key string `json:"key" jsonschema:"home, back, recents, enter, backspace, wake, power, volume_up or volume_down"`
@@ -321,8 +322,9 @@ func scrollVector(b device.Bounds, dir string) (x1, y1, x2, y2 int, err error) {
 }
 
 func (t *tools) typeText(ctx context.Context, _ *sdk.CallToolRequest, in typeTextIn) (*sdk.CallToolResult, any, error) {
+	submit := in.Submit || in.Send
 	done, err := t.nodeAction(in.Ref, true, func(a device.NodeActor, ref string) error {
-		return a.SetNodeText(ctx, ref, in.Text, in.Replace, in.Submit)
+		return a.SetNodeText(ctx, ref, in.Text, in.Replace, submit)
 	})
 	if done || err != nil {
 		t.state.bump()
@@ -344,7 +346,7 @@ func (t *tools) typeText(ctx context.Context, _ *sdk.CallToolRequest, in typeTex
 	} else {
 		defer t.state.bump()
 	}
-	if err := t.dev.TypeText(ctx, in.Text, in.Replace, in.Submit); err != nil {
+	if err := t.dev.TypeText(ctx, in.Text, in.Replace, submit); err != nil {
 		return nil, nil, err
 	}
 	return text("ok"), nil, nil
