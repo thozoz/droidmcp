@@ -169,8 +169,8 @@ class Server(
         }
     }
 
-    private fun inject(ev: InputEvent) {
-        if (!ua.injectInputEvent(ev, true)) {
+    private fun inject(ev: InputEvent, sync: Boolean = true) {
+        if (!ua.injectInputEvent(ev, sync)) {
             throw IllegalStateException(
                 "input injection blocked; on MIUI enable 'USB debugging (Security settings)' in developer options"
             )
@@ -181,7 +181,8 @@ class Server(
         val ev = MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
         ev.source = InputDevice.SOURCE_TOUCHSCREEN
         try {
-            inject(ev)
+            // Waiting on every MOVE doubles a swipe's duration; DOWN/UP stay synchronous.
+            inject(ev, sync = action != MotionEvent.ACTION_MOVE)
         } finally {
             ev.recycle()
         }
