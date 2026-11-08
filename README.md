@@ -32,12 +32,22 @@ Open **droidmcp** on the phone once (it writes `start.sh`), then:
 adb shell sh /sdcard/Android/data/com.efe.droidmcp/files/start.sh
 ```
 
-Install the bridge and register it with your MCP client, e.g. Claude Code:
+The easiest way to connect: tap **Copy setup prompt** in the app and paste it
+into your agent (e.g. Claude Code). It does the steps below itself.
+
+The bridge ships inside the APK for Windows, macOS and Linux (amd64/arm64).
+It is a single executable with nothing to install; copy the one for your
+computer from the phone and register it by absolute path:
 
 ```sh
-cd daemon && go install ./cmd/droidmcp-bridge
-claude mcp add android -- droidmcp-bridge
+mkdir -p ~/.droidmcp
+adb pull /sdcard/Android/data/com.efe.droidmcp/files/bridge/droidmcp-bridge-darwin-arm64 ~/.droidmcp/droidmcp-bridge
+chmod +x ~/.droidmcp/droidmcp-bridge     # not on Windows (keep the .exe name there)
+claude mcp add android -- ~/.droidmcp/droidmcp-bridge
 ```
+
+Because it comes from the phone, the bridge always matches the daemon's
+version. (From source: `cd daemon && go install ./cmd/droidmcp-bridge`.)
 
 The bridge waits for the phone, runs `adb forward`, and reads the daemon's
 token over adb, refetching it after a daemon restart or token rotation.

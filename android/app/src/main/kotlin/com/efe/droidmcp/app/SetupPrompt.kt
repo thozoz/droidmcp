@@ -11,7 +11,6 @@ import java.net.Inet4Address
  * carries this phone's Wi-Fi address and the token.
  */
 object SetupPrompt {
-    private const val REPO = "github.com/thozoz/droidmcp"
 
     /** Returns the prompt and whether it contains the token. */
     fun build(context: Context): Pair<String, Boolean> {
@@ -28,11 +27,13 @@ object SetupPrompt {
         Set up droidmcp, an MCP server that lets you see and control my Android phone, and connect yourself to it. The phone is plugged into this computer with USB debugging on.
 
         1. Run `adb devices`. If no device is listed, stop and ask me to plug in the phone and allow USB debugging.
-        2. Start the server on the phone: `adb shell sh /sdcard/Android/data/com.efe.droidmcp/files/start.sh`
-        3. If `droidmcp-bridge` is not on PATH, install it: `go install $REPO/daemon/cmd/droidmcp-bridge@latest`. It forwards the port and reads the token over adb, so no secret is needed here.
-        4. Register it as an MCP server named "android":
-           - Claude Code: `claude mcp add android -- droidmcp-bridge`
-           - Other clients: add {"mcpServers":{"android":{"command":"droidmcp-bridge"}}} to their MCP config.
+        2. Start the server on the phone: `adb shell sh ${DroidMcpApp.START_COMMAND.removePrefix("adb shell sh ")}`
+        3. Copy the bridge from the phone. It is a single executable that needs no installation: it forwards the port and reads the token over adb, so no secret is needed here. Pick the file for this computer's OS and CPU from `${DroidMcpApp.BRIDGE_DIR}/`:
+           droidmcp-bridge-windows-amd64.exe, droidmcp-bridge-darwin-arm64, droidmcp-bridge-darwin-amd64, droidmcp-bridge-linux-amd64, droidmcp-bridge-linux-arm64
+           Create the folder `.droidmcp` in my home directory and pull it there, e.g. `adb pull ${DroidMcpApp.BRIDGE_DIR}/droidmcp-bridge-darwin-arm64 ~/.droidmcp/droidmcp-bridge` (on Windows keep the .exe name). On macOS and Linux run `chmod +x` on it.
+        4. Register it as an MCP server named "android", using its absolute path:
+           - Claude Code: `claude mcp add android -- <absolute path to droidmcp-bridge>`
+           - Other clients: add {"mcpServers":{"android":{"command":"<absolute path to droidmcp-bridge>"}}} to their MCP config.
         5. Tell me to restart or reload you so the tools load. Then call the `screenshot` tool to confirm it works.
     """.trimIndent()
 

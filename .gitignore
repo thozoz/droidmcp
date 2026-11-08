@@ -14,3 +14,4 @@ keystore.properties
 
 # Daemon binary built into the APK by scripts/build-apk.sh
 android/app/src/main/jniLibs/
+android/app/src/main/assets/bridge/
