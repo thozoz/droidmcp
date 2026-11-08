@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/thozoz/droidmcp/daemon/internal/auth"
+	"github.com/thozoz/droidmcp/daemon/internal/clients"
 	"github.com/thozoz/droidmcp/daemon/internal/device"
 	"github.com/thozoz/droidmcp/daemon/internal/mcp"
 )
@@ -75,12 +76,23 @@ func run() error {
 		defer h.Close()
 		dev = h
 	}
+	// Client count changes go to the app's notification; a single worker sends
+	// the latest count so a slow `am broadcast` never blocks a request.
+	clientsChanged := make(chan struct{}, 1)
+	tracker := clients.New(2*time.Minute, func(int) {
+		select {
+		case clientsChanged <- struct{}{}:
+		default:
+		}
+	})
 	srv := mcp.NewServer(dev, mcp.Options{
 		MaxEdge: *maxEdge, EnableShell: *enableShell, Version: version, Logger: sdkLogger,
 	})
 	httpSrv := &http.Server{
-		Addr:              *addr,
-		Handler:           mcp.NewHandler(auth.NewTokenValue(*token), srv, stop, writeToken, sdkLogger),
+		Addr: *addr,
+		Handler: mcp.NewHandler(srv, mcp.HandlerOptions{
+			Token: auth.NewTokenValue(*token), Shutdown: stop, Rotated: writeToken, Clients: tracker, Logger: sdkLogger,
+		}),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
@@ -94,6 +106,12 @@ func run() error {
 	go func() { errc <- httpSrv.Serve(ln) }()
 	link.started()
 	defer link.stopped()
+	go tracker.Run(ctx)
+	go func() {
+		for range clientsChanged {
+			link.clients(len(tracker.Active()))
+		}
+	}()
 	logger.Info("listening", "addr", *addr, "version", version, "token_file", *tokenFile, "shell", *enableShell, "helper", *apk != "")
 
 	select {

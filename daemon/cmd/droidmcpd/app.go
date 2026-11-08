@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -41,6 +42,13 @@ func (a appLink) started() {
 	// Explicit component + the receiver's DUMP permission: only the shell can send
 	// this and only our app receives it; the app keeps the token for its Stop action.
 	a.broadcast("com.efe.droidmcp.DAEMON_STARTED", "--ei", "port", a.port, "--es", "token", a.token)
+}
+
+// clients updates the notification's client count.
+func (a appLink) clients(n int) {
+	if a.pkg != "" {
+		a.broadcast("com.efe.droidmcp.DAEMON_CLIENTS", "--ei", "clients", strconv.Itoa(n))
+	}
 }
 
 func (a appLink) stopped() {

@@ -8,10 +8,12 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/thozoz/droidmcp/daemon/internal/auth"
+	"github.com/thozoz/droidmcp/daemon/internal/clients"
 	"github.com/thozoz/droidmcp/daemon/internal/device"
 )
 
@@ -92,7 +94,7 @@ func call(t *testing.T, cs *sdk.ClientSession, name string, args map[string]any)
 
 func newTestServer(t *testing.T, dev *fakeDevice) string {
 	t.Helper()
-	ts := httptest.NewServer(NewHandler(auth.NewTokenValue("tok"), NewServer(dev, Options{MaxEdge: 1080}), nil, nil, nil))
+	ts := httptest.NewServer(NewHandler(NewServer(dev, Options{MaxEdge: 1080}), HandlerOptions{Token: auth.NewTokenValue("tok")}))
 	t.Cleanup(ts.Close)
 	return ts.URL + "/mcp"
 }
@@ -155,7 +157,7 @@ func TestShellToolGated(t *testing.T) {
 }
 
 func TestHandlerRequiresToken(t *testing.T) {
-	ts := httptest.NewServer(NewHandler(auth.NewTokenValue("tok"), NewServer(&fakeDevice{}, Options{}), nil, nil, nil))
+	ts := httptest.NewServer(NewHandler(NewServer(&fakeDevice{}, Options{}), HandlerOptions{Token: auth.NewTokenValue("tok")}))
 	defer ts.Close()
 	for _, p := range []string{"/mcp", "/health"} {
 		resp, err := http.Get(ts.URL + p)
@@ -171,8 +173,8 @@ func TestHandlerRequiresToken(t *testing.T) {
 
 func TestTokenRotation(t *testing.T) {
 	var saved string
-	ts := httptest.NewServer(NewHandler(auth.NewTokenValue("old"), NewServer(&fakeDevice{}, Options{}), nil,
-		func(tok string) { saved = tok }, nil))
+	ts := httptest.NewServer(NewHandler(NewServer(&fakeDevice{}, Options{}), HandlerOptions{
+		Token: auth.NewTokenValue("old"), Rotated: func(tok string) { saved = tok }}))
 	defer ts.Close()
 	do := func(method, path, tok string) (int, string) {
 		req, _ := http.NewRequest(method, ts.URL+path, nil)
@@ -196,5 +198,32 @@ func TestTokenRotation(t *testing.T) {
 	}
 	if code, _ := do(http.MethodGet, "/health", fresh); code != http.StatusOK {
 		t.Errorf("new token: %d", code)
+	}
+}
+
+// Only MCP calls count as clients; the app's own polling of the control
+// endpoints must not inflate the count.
+func TestClientsCountsOnlyMCPTraffic(t *testing.T) {
+	tr := clients.New(time.Minute, nil)
+	ts := httptest.NewServer(NewHandler(NewServer(&fakeDevice{}, Options{}), HandlerOptions{
+		Token: auth.NewTokenValue("tok"), Clients: tr,
+	}))
+	defer ts.Close()
+	for _, p := range []string{"/health", "/clients"} {
+		req, _ := http.NewRequest(http.MethodGet, ts.URL+p, nil)
+		req.Header.Set("Authorization", "Bearer tok")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+	}
+	if n := len(tr.Active()); n != 0 {
+		t.Fatalf("control endpoints counted as %d clients", n)
+	}
+	cs := connect(t, ts.URL+"/mcp", "")
+	call(t, cs, "current_app", nil)
+	if act := tr.Active(); len(act) != 1 || act[0].Via != "adb" {
+		t.Fatalf("after MCP call: %+v", act)
 	}
 }
