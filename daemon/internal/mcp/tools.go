@@ -321,7 +321,9 @@ func scrollVector(b device.Bounds, dir string) (x1, y1, x2, y2 int, err error) {
 }
 
 func (t *tools) typeText(ctx context.Context, _ *sdk.CallToolRequest, in typeTextIn) (*sdk.CallToolResult, any, error) {
-	done, err := t.nodeAction(in.Ref, true, func(a device.NodeActor, ref string) error { return a.SetNodeText(ctx, ref, in.Text, in.Replace, in.Submit) })
+	done, err := t.nodeAction(in.Ref, true, func(a device.NodeActor, ref string) error {
+		return a.SetNodeText(ctx, ref, in.Text, in.Replace, in.Submit)
+	})
 	if done || err != nil {
 		t.state.bump()
 		if err != nil {
