@@ -17,7 +17,7 @@ type Device interface {
 	Tap(ctx context.Context, x, y int) error
 	LongPress(ctx context.Context, x, y, ms int) error
 	Swipe(ctx context.Context, x1, y1, x2, y2, ms int) error
-	TypeText(ctx context.Context, text string) error
+	TypeText(ctx context.Context, text string, replace bool) error
 	Key(ctx context.Context, k Key) error
 	OpenApp(ctx context.Context, pkgOrLabel string) error
 	ListApps(ctx context.Context) ([]App, error)
@@ -29,7 +29,7 @@ type Device interface {
 // directly (accessibility actions) instead of tapping their bounds.
 type NodeActor interface {
 	ClickNode(ctx context.Context, ref string) error
-	SetNodeText(ctx context.Context, ref, text string) error
+	SetNodeText(ctx context.Context, ref, text string, replace bool) error
 }
 
 // DisplayInfo describes the display in device pixels, already rotated
@@ -103,6 +103,7 @@ const (
 	KeyBack       Key = "back"
 	KeyRecents    Key = "recents"
 	KeyEnter      Key = "enter"
+	KeyBackspace  Key = "backspace"
 	KeyWake       Key = "wake"
 	KeyPower      Key = "power"
 	KeyVolumeUp   Key = "volume_up"
@@ -115,6 +116,7 @@ var Keycodes = map[Key]string{
 	KeyBack:       "KEYCODE_BACK",
 	KeyRecents:    "KEYCODE_APP_SWITCH",
 	KeyEnter:      "KEYCODE_ENTER",
+	KeyBackspace:  "KEYCODE_DEL",
 	KeyWake:       "KEYCODE_WAKEUP",
 	KeyPower:      "KEYCODE_POWER",
 	KeyVolumeUp:   "KEYCODE_VOLUME_UP",

@@ -44,7 +44,7 @@ func (f *fakeDevice) Tap(_ context.Context, x, y int) error {
 }
 func (f *fakeDevice) LongPress(context.Context, int, int, int) error       { return nil }
 func (f *fakeDevice) Swipe(context.Context, int, int, int, int, int) error { return nil }
-func (f *fakeDevice) TypeText(context.Context, string) error               { return nil }
+func (f *fakeDevice) TypeText(context.Context, string, bool) error         { return nil }
 func (f *fakeDevice) Key(context.Context, device.Key) error                { return nil }
 func (f *fakeDevice) OpenApp(context.Context, string) error                { return nil }
 func (f *fakeDevice) ListApps(context.Context) ([]device.App, error)       { return nil, nil }

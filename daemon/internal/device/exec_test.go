@@ -66,7 +66,7 @@ func TestInputUsesArgvAndDetectsBlock(t *testing.T) {
 		"input": {{}, {out: "SecurityException: INJECT_EVENTS", err: errors.New("exit status 1")}},
 	}}
 	e := &Exec{run: f.run}
-	if err := e.TypeText(context.Background(), "a b;c"); err != nil {
+	if err := e.TypeText(context.Background(), "a b;c", false); err != nil {
 		t.Fatal(err)
 	}
 	if want := []string{"input", "text", "a%sb;c"}; !slices.Equal(f.calls[0], want) {

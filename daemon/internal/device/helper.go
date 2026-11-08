@@ -80,7 +80,7 @@ func appProcessSpawner(e *Exec, apk string) spawnFunc {
 		defer l.Close()
 
 		cmd := exec.Command("app_process", "-Djava.class.path="+path, "/system/bin",
-			"com.efe.droidmcp.helper.Main", "serve", name)
+			"com.thozoz.droidmcp.helper.Main", "serve", name)
 		cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr // helper logs land in the daemon log
 		if err := cmd.Start(); err != nil {
 			return nil, nil, fmt.Errorf("start helper: %w", err)
@@ -250,11 +250,11 @@ func (h *Helper) Swipe(ctx context.Context, x1, y1, x2, y2, ms int) error {
 	return err
 }
 
-func (h *Helper) TypeText(ctx context.Context, text string) error {
-	if text == "" {
+func (h *Helper) TypeText(ctx context.Context, text string, replace bool) error {
+	if text == "" && !replace {
 		return errors.New("text is empty")
 	}
-	_, err := h.call(ctx, "type", map[string]string{"text": text}, nil)
+	_, err := h.call(ctx, "type", map[string]any{"text": text, "replace": replace}, nil)
 	return err
 }
 
@@ -272,8 +272,8 @@ func (h *Helper) ClickNode(ctx context.Context, ref string) error {
 	return err
 }
 
-func (h *Helper) SetNodeText(ctx context.Context, ref, text string) error {
-	_, err := h.call(ctx, "set_text", map[string]string{"ref": ref, "text": text}, nil)
+func (h *Helper) SetNodeText(ctx context.Context, ref, text string, replace bool) error {
+	_, err := h.call(ctx, "set_text", map[string]any{"ref": ref, "text": text, "replace": replace}, nil)
 	return err
 }
 

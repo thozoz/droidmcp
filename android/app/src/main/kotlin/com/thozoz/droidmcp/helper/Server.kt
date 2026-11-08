@@ -1,4 +1,4 @@
-package com.efe.droidmcp.helper
+package com.thozoz.droidmcp.helper
 
 import android.app.UiAutomation
 import android.content.ClipData
@@ -67,8 +67,8 @@ class Server(
         "swipe" -> { swipe(a.getInt("x1"), a.getInt("y1"), a.getInt("x2"), a.getInt("y2"), a.getLong("ms")); null to null }
         "key" -> { key(a.getString("code")); null to null }
         "click" -> { click(a.getString("ref")); null to null }
-        "set_text" -> { appendText(node(a.getString("ref")), a.getString("text")); null to null }
-        "type" -> { appendText(findFocusedInput(), a.getString("text")); null to null }
+        "set_text" -> { appendText(node(a.getString("ref")), a.optString("text", ""), a.optBoolean("replace", false)); null to null }
+        "type" -> { appendText(findFocusedInput(), a.optString("text", ""), a.optBoolean("replace", false)); null to null }
         "apps" -> apps() to null
         else -> throw IllegalArgumentException("unknown op $op")
     }
@@ -160,22 +160,39 @@ class Server(
         ua.windows.firstNotNullOfOrNull { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) }
             ?: ua.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
-    /** ACTION_SET_TEXT replaces, so keep what is already typed (unless it is only a hint). */
-    private fun appendText(n: AccessibilityNodeInfo?, text: String) {
+    /** ACTION_SET_TEXT replaces; when replace is false, appends to current text. */
+    private fun appendText(n: AccessibilityNodeInfo?, text: String, replace: Boolean = false) {
         if (n != null && n.isEditable) {
-            val current = if (n.isShowingHintText) "" else n.text?.toString().orEmpty()
+            val newText = if (replace) text else {
+                val current = if (n.isShowingHintText) "" else n.text?.toString().orEmpty()
+                current + text
+            }
             val args = Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, current + text)
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
             }
             if (n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
                 return
             }
         }
-        // SET_TEXT was refused or node not directly settable: fall back to clipboard + paste.
-        pasteFallback(n, text)
+        if (replace && text.isEmpty()) {
+            // Clearing field when SET_TEXT refused
+            if (n != null) {
+                val len = n.text?.length ?: 0
+                if (len > 0) {
+                    val selArgs = Bundle().apply {
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, len)
+                    }
+                    n.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selArgs)
+                    key("KEYCODE_DEL")
+                }
+            }
+            return
+        }
+        pasteFallback(n, text, replace)
     }
 
-    private fun pasteFallback(n: AccessibilityNodeInfo?, text: String) {
+    private fun pasteFallback(n: AccessibilityNodeInfo?, text: String, replace: Boolean = false) {
         val prevClip = Clipboard.getPrimaryClip()
         val clip = ClipData.newPlainText("text", text)
         if (!Clipboard.setPrimaryClip(clip)) {
@@ -184,7 +201,13 @@ class Server(
         try {
             if (n != null) {
                 val len = n.text?.length ?: 0
-                if (len > 0) {
+                if (replace) {
+                    val selArgs = Bundle().apply {
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, 0)
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, len)
+                    }
+                    n.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selArgs)
+                } else if (len > 0) {
                     val selArgs = Bundle().apply {
                         putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, len)
                         putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, len)
