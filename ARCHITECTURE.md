@@ -26,8 +26,11 @@ backends that can act on nodes directly.
   The APK path is resolved with `pm path` on every spawn, so app updates are
   picked up. It listens on an abstract unix socket `@droidmcp-<random>` and
   accepts only a peer whose SO_PEERCRED uid is 2000 and whose pid is the child
-  it spawned. App and package queries (`open_app`, `list_apps`,
-  `current_app`, `shell`) have no UiAutomation equivalent and stay on `Exec`.
+  it spawned. Launcher app queries (`open_app`, `list_apps`) query
+  `PackageManager` through the helper (`ActivityThread.systemMain().getSystemContext()`);
+  `current_app` and `shell` stay on `Exec`. Field typing uses `ACTION_SET_TEXT`
+  with a clipboard + paste fallback (`ACTION_PASTE` or `KEYCODE_PASTE` via the hidden
+  `IClipboard` service) when refused.
 - **Helper crashes.** A request whose connection dies returns an error and is
   **not** retried, since a tap may already have happened. The next request
   starts a fresh helper. After 3 restarts within a minute it stops trying

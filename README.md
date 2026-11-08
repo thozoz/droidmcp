@@ -79,8 +79,7 @@ using one returns `stale ref, call ui_tree`. `tap` and `type_text` with a ref
 use the accessibility action (`ACTION_CLICK`, `ACTION_SET_TEXT`) and fall back
 to touching the node's bounds.
 
-Known gaps: `open_app` by label matches package names, not app labels; fields
-that refuse `ACTION_SET_TEXT` have no clipboard fallback yet; display 0 only.
+Known gaps: display 0 only.
 
 ## Stopping
 
