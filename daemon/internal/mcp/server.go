@@ -28,7 +28,7 @@ func NewServer(dev device.Device, opts Options) *sdk.Server {
 	if opts.MaxEdge <= 0 {
 		opts.MaxEdge = 1080
 	}
-	srv := sdk.NewServer(&sdk.Implementation{Name: "droidmcp", Version: opts.Version}, &sdk.ServerOptions{Logger: opts.Logger})
+	srv := sdk.NewServer(&sdk.Implementation{Name: "droidmcp", Version: opts.Version}, &sdk.ServerOptions{Logger: opts.Logger, Instructions: Instructions})
 	t := &tools{dev: dev, maxEdge: opts.MaxEdge, state: &deviceState{}}
 	t.primeDisplay(opts.Logger)
 	t.register(srv, opts.EnableShell)

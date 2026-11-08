@@ -71,7 +71,7 @@ converts them to device pixels.
 | `key` | home, back, recents, enter, wake, power, volume_up, volume_down |
 | `open_app` | `package` or `label` |
 | `list_apps`, `current_app` | none |
-| `wait_for` | `text` or `ref`, `timeout_ms` |
+| `wait_for` | `text` or `ref` (`gone` to wait until it disappears), `timeout_ms`; neither = plain wait |
 | `shell` | `cmd`; only with the shell option enabled |
 
 A ref belongs to one snapshot. Any screen-changing tool makes every ref stale;

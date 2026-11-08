@@ -20,6 +20,8 @@ import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 
+private val PLACEHOLDERS = setOf("Mesaj", "Message", "Search", "Ara")
+
 /**
  * Serves daemon requests one at a time. Each request is
  * {"id","op","args"}; each response is {"id","ok","error"?,"result"?,"binary"?},
@@ -164,7 +166,7 @@ class Server(
     private fun appendText(n: AccessibilityNodeInfo?, text: String, replace: Boolean = false, submit: Boolean = false) {
         if (n != null && n.isEditable) {
             val newText = if (replace) text else {
-                val current = if (n.isShowingHintText) "" else n.text?.toString().orEmpty()
+                val current = if (showsHint(n)) "" else n.text?.toString().orEmpty()
                 current + text
             }
             val args = Bundle().apply {
@@ -191,34 +193,22 @@ class Server(
             if (submit) triggerSubmit(n)
             return
         }
-        pasteFallback(n, text, replace)
+        pasteFallback(n, text, replace || (n != null && showsHint(n)))
         if (submit) triggerSubmit(n)
     }
 
+    // Some apps (WhatsApp, Instagram) report the placeholder as text with isShowingHintText false.
+    // shortcut: fixed placeholder list misreads a field whose real text is exactly one of these; drop it if that bites.
+    private fun showsHint(n: AccessibilityNodeInfo): Boolean {
+        val raw = n.text?.toString().orEmpty()
+        val hint = n.hintText?.toString()
+        return n.isShowingHintText || (hint != null && raw == hint) || raw in PLACEHOLDERS
+    }
+
+    // Never hunts for a "send" button: label guessing can hit the wrong one (in Turkish "Ara" is also "Call").
+    // Apps whose send is a button only need an explicit tap on it.
     private fun triggerSubmit(n: AccessibilityNodeInfo?) {
         SystemClock.sleep(100) // Brief pause for UI state update after text entry
-
-        fun findSendButton(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
-            if (node == null) return null
-            val id = node.viewIdResourceName?.lowercase().orEmpty()
-            val desc = node.contentDescription?.toString()?.lowercase().orEmpty()
-            if (node.isClickable && (id.endsWith(":id/send") || id.contains("send_button") ||
-                    desc == "gönder" || desc == "send" || desc == "ara" || desc == "search")) {
-                return node
-            }
-            for (i in 0 until node.childCount) {
-                val found = findSendButton(node.getChild(i))
-                if (found != null) return found
-            }
-            return null
-        }
-
-        val roots = ua.windows.mapNotNull { it.root }.ifEmpty { listOfNotNull(ua.rootInActiveWindow) }
-        val sendBtn = roots.firstNotNullOfOrNull { findSendButton(it) }
-        if (sendBtn != null && sendBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            return
-        }
-
         if (n != null && n.performAction(android.R.id.accessibilityActionImeEnter)) {
             return
         }

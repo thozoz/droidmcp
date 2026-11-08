@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -50,8 +51,8 @@ type (
 		Text    string `json:"text,omitempty" jsonschema:"text to type or set"`
 		Ref     string `json:"ref,omitempty" jsonschema:"field to tap first"`
 		Replace bool   `json:"replace,omitempty" jsonschema:"replace existing text instead of appending (empty text clears the field)"`
-		Submit  bool   `json:"submit,omitempty" jsonschema:"automatically submit/send after typing (presses send button, IME action or enter)"`
-		Send    bool   `json:"send,omitempty" jsonschema:"alias for submit; automatically presses send button or enter after typing"`
+		Submit  bool   `json:"submit,omitempty" jsonschema:"after typing, run the field IME action or press enter; never taps a send button (in chat apps tap it yourself via ui_tree)"`
+		Send    bool   `json:"send,omitempty" jsonschema:"alias for submit"`
 	}
 	keyIn struct {
 		Key string `json:"key" jsonschema:"home, back, recents, enter, backspace, wake, power, volume_up or volume_down"`
@@ -63,7 +64,8 @@ type (
 	waitForIn struct {
 		Text      string `json:"text,omitempty" jsonschema:"case-insensitive substring of a node's text or content-desc"`
 		Ref       string `json:"ref,omitempty" jsonschema:"wait until the node this ref pointed at is on screen again"`
-		TimeoutMs int    `json:"timeout_ms,omitempty" jsonschema:"default 5000, max 60000"`
+		Gone      bool   `json:"gone,omitempty" jsonschema:"with text or ref: wait until it is no longer on screen (e.g. a typing or loading indicator)"`
+		TimeoutMs int    `json:"timeout_ms,omitempty" jsonschema:"default 5000, max 60000; with neither text nor ref, the time to just wait"`
 	}
 	shellIn struct {
 		Cmd string `json:"cmd" jsonschema:"command line run with sh -c as the shell user"`
@@ -76,18 +78,18 @@ func (t *tools) register(s *sdk.Server, enableShell bool) {
 	sdk.AddTool(s, &sdk.Tool{Name: "screenshot", Annotations: ro,
 		Description: "Capture the screen. Defines screenshot space: the image is scaled so its long edge is at most the server's max edge." + coordNote}, t.screenshot)
 	sdk.AddTool(s, &sdk.Tool{Name: "ui_tree", Annotations: ro,
-		Description: "Dump the UI hierarchy. Each node gets a ref s<snapshot>.e<n>; refs go stale after any screen-changing tool. Bounds are [left,top,right,bottom]." + coordNote}, t.uiTree)
-	sdk.AddTool(s, &sdk.Tool{Name: "tap", Description: "Tap a node (ref) or a point (x,y)." + coordNote}, t.tap)
+		Description: "Dump the UI hierarchy of what is on screen now (not off-screen list items). Each node gets a ref s<snapshot>.e<n>; refs go stale after any screen-changing tool. Bounds are [left,top,right,bottom]." + coordNote}, t.uiTree)
+	sdk.AddTool(s, &sdk.Tool{Name: "tap", Description: "Tap a node (ref) or a point (x,y). A clickable ref is clicked through accessibility; if that fails nothing is tapped and an error is returned: read the screen again instead of retrying blindly." + coordNote}, t.tap)
 	sdk.AddTool(s, &sdk.Tool{Name: "long_press", Description: "Long-press a node (ref) or a point (x,y)." + coordNote}, t.longPress)
 	sdk.AddTool(s, &sdk.Tool{Name: "swipe", Description: "Swipe from (x1,y1) to (x2,y2)." + coordNote}, t.swipe)
-	sdk.AddTool(s, &sdk.Tool{Name: "scroll", Description: "Scroll a scrollable node, or the whole screen." + coordNote}, t.scroll)
+	sdk.AddTool(s, &sdk.Tool{Name: "scroll", Description: "Scroll a scrollable node (pass its ref), or the whole screen. Lists, feeds and chats show only part of their content: scroll to read more and read again after each scroll. A whole-screen scroll can hit an open on-screen keyboard and type into the field; close it with key back first." + coordNote}, t.scroll)
 	sdk.AddTool(s, &sdk.Tool{Name: "type_text", Description: "Type text into a field (ref) or the focused field; appends by default, or replaces/clears with replace:true. If the field refuses direct text setting, the text is pasted via the clipboard, which overwrites the user's clipboard content (it cannot be restored). The exec fallback backend accepts printable ASCII only."}, t.typeText)
 	sdk.AddTool(s, &sdk.Tool{Name: "key", Description: "Press a system key."}, t.key)
 	sdk.AddTool(s, &sdk.Tool{Name: "open_app", Description: "Launch an app by package name or app label."}, t.openApp)
 	sdk.AddTool(s, &sdk.Tool{Name: "list_apps", Annotations: ro, Description: "List launchable apps with their labels and package names."}, t.listApps)
 	sdk.AddTool(s, &sdk.Tool{Name: "current_app", Annotations: ro, Description: "Report the foreground package and activity."}, t.currentApp)
 	sdk.AddTool(s, &sdk.Tool{Name: "wait_for", Annotations: ro,
-		Description: "Poll the UI until a node with the text (or the node an old ref pointed at) appears. Returns a fresh ref." + coordNote}, t.waitFor)
+		Description: "Wait. With text or ref: poll the UI until a matching node appears (returns a fresh ref), or with gone:true until it disappears. With neither: just wait timeout_ms without reading the screen. Use it to stay on a task instead of ending your turn." + coordNote}, t.waitFor)
 	if enableShell {
 		sdk.AddTool(s, &sdk.Tool{Name: "shell", Description: "Run a shell command as the shell user (uid 2000)."}, t.shell)
 	}
@@ -223,11 +225,14 @@ func (t *tools) tap(ctx context.Context, _ *sdk.CallToolRequest, in pointIn) (*s
 		}
 		clickable = n.Clickable
 	}
-	done, err := t.nodeAction(in.Ref, clickable, func(a device.NodeActor, ref string) error { return a.ClickNode(ctx, ref) })
-	if done || err != nil {
+	if a, ok := t.dev.(device.NodeActor); ok && clickable {
+		// No fallback to the node's old bounds: the screen may have changed and
+		// another control may sit there now (WhatsApp's send turns into the mic).
+		n, _, _ := t.state.resolve(in.Ref)
+		err := a.ClickNode(ctx, n.Ref)
 		t.state.bump()
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("click on %s failed, nothing was tapped; call ui_tree and retry: %w", in.Ref, err)
 		}
 		return text("ok (accessibility click)"), nil, nil
 	}
@@ -417,23 +422,32 @@ func (t *tools) waitFor(ctx context.Context, _ *sdk.CallToolRequest, in waitForI
 		match = func(n device.Node) bool {
 			return strings.Contains(strings.ToLower(n.Text), q) || strings.Contains(strings.ToLower(n.Desc), q)
 		}
-	default:
-		return nil, nil, errors.New("give text or ref")
 	}
 	timeout := time.Duration(min(max(in.TimeoutMs, 0), 60000)) * time.Millisecond
 	if timeout == 0 {
 		timeout = 5 * time.Second
+	}
+	if match == nil {
+		// Plain wait: never reads the screen, so nothing on it can end the wait early.
+		select {
+		case <-ctx.Done():
+			return nil, nil, ctx.Err()
+		case <-time.After(timeout):
+			return text(fmt.Sprintf("waited %v; read the screen again", timeout)), nil, nil
+		}
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	for {
 		id, nodes, d, err := t.snapshot(ctx, false)
 		if err == nil {
-			for _, n := range nodes {
-				if match(n) {
-					sp := newSpace(d, t.maxEdge)
-					return text(fmt.Sprintf("found in snapshot s%d %s\n%s", id, sp.header(), formatNode(id, n, sp))), nil, nil
-				}
+			i := slices.IndexFunc(nodes, match)
+			switch {
+			case i >= 0 && !in.Gone:
+				sp := newSpace(d, t.maxEdge)
+				return text(fmt.Sprintf("found in snapshot s%d %s\n%s", id, sp.header(), formatNode(id, nodes[i], sp))), nil, nil
+			case i < 0 && in.Gone:
+				return text(fmt.Sprintf("gone in snapshot s%d; refs from it are current", id)), nil, nil
 			}
 		}
 		select {

@@ -15,6 +15,7 @@ import (
 	"github.com/thozoz/droidmcp/daemon/internal/auth"
 	"github.com/thozoz/droidmcp/daemon/internal/clients"
 	"github.com/thozoz/droidmcp/daemon/internal/device"
+	"github.com/thozoz/droidmcp/daemon/internal/ipc"
 )
 
 // fakeDevice serves testNodes on a 1080x2400 display and records taps.
@@ -225,5 +226,51 @@ func TestClientsCountsOnlyMCPTraffic(t *testing.T) {
 	call(t, cs, "current_app", nil)
 	if act := tr.Active(); len(act) != 1 || act[0].Via != "adb" {
 		t.Fatalf("after MCP call: %+v", act)
+	}
+}
+
+// failingActor refuses accessibility clicks.
+type failingActor struct{ fakeDevice }
+
+func (f *failingActor) ClickNode(context.Context, string) error {
+	return &ipc.RemoteError{Msg: "click refused"}
+}
+func (f *failingActor) UITree(context.Context, bool) ([]device.Node, device.DisplayInfo, error) {
+	n := testNodes()
+	n[0].Clickable = true
+	return n, testDisplay, nil
+}
+func (f *failingActor) SetNodeText(context.Context, string, string, bool, bool) error { return nil }
+
+// A failed click on a ref must not fall back to tapping the node's old
+// bounds: by then another control may sit there.
+func TestTapRefNoCoordinateFallback(t *testing.T) {
+	dev := &failingActor{}
+	ts := httptest.NewServer(NewHandler(NewServer(dev, Options{MaxEdge: 1080}), HandlerOptions{Token: auth.NewTokenValue("tok")}))
+	defer ts.Close()
+	cs := connect(t, ts.URL+"/mcp", "")
+	call(t, cs, "ui_tree", nil)
+	if out, isErr := call(t, cs, "tap", map[string]any{"ref": "s1.e1"}); !isErr || !strings.Contains(out, "nothing was tapped") {
+		t.Fatalf("want error, got isErr=%v %q", isErr, out)
+	}
+	if len(dev.taps) != 0 {
+		t.Fatalf("fell back to coordinate taps: %v", dev.taps)
+	}
+}
+
+func TestWaitForModes(t *testing.T) {
+	cs := connect(t, newTestServer(t, &fakeDevice{}), "")
+	if cs.InitializeResult().Instructions != Instructions {
+		t.Error("instructions not sent at initialize")
+	}
+	if out, isErr := call(t, cs, "wait_for", map[string]any{"text": "absent", "gone": true}); isErr || !strings.HasPrefix(out, "gone in snapshot") {
+		t.Errorf("gone on absent text: isErr=%v %q", isErr, out)
+	}
+	if out, isErr := call(t, cs, "wait_for", map[string]any{"text": "OK", "gone": true, "timeout_ms": 600}); !isErr || !strings.Contains(out, "timed out") {
+		t.Errorf("gone on present text: isErr=%v %q", isErr, out)
+	}
+	start := time.Now()
+	if out, isErr := call(t, cs, "wait_for", map[string]any{"timeout_ms": 200}); isErr || !strings.HasPrefix(out, "waited") || time.Since(start) < 200*time.Millisecond {
+		t.Errorf("plain wait: isErr=%v %q after %v", isErr, out, time.Since(start))
 	}
 }

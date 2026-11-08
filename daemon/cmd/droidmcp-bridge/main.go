@@ -19,6 +19,8 @@ import (
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/thozoz/droidmcp/daemon/internal/mcp"
 )
 
 var version = "dev"
@@ -69,7 +71,7 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	srv := sdk.NewServer(&sdk.Implementation{Name: "droidmcp", Version: version}, nil)
+	srv := sdk.NewServer(&sdk.Implementation{Name: "droidmcp", Version: version}, &sdk.ServerOptions{Instructions: mcp.Instructions})
 
 	// Fetch tools synchronously if phone is already reachable so client gets them on initial tools/list.
 	initCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
