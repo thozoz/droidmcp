@@ -382,7 +382,8 @@ func (t *tools) waitFor(ctx context.Context, _ *sdk.CallToolRequest, in waitForI
 		}
 		select {
 		case <-ctx.Done():
-			if err != nil {
+			// A dump cut short by our own deadline is not worth reporting.
+			if err != nil && !errors.Is(err, context.DeadlineExceeded) {
 				return nil, nil, fmt.Errorf("timed out after %v; last error: %w", timeout, err)
 			}
 			return nil, nil, fmt.Errorf("timed out after %v", timeout)

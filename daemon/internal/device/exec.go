@@ -112,8 +112,14 @@ func (e *Exec) dump(ctx context.Context) error {
 		if strings.Contains(msg, "could not get idle state") && attempt == 0 {
 			continue
 		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err != nil || strings.Contains(msg, "ERROR") {
-			return fmt.Errorf("uiautomator dump failed: %s", firstLine(msg))
+			if msg = firstLine(msg); msg == "" && err != nil {
+				msg = err.Error()
+			}
+			return fmt.Errorf("uiautomator dump failed: %s", msg)
 		}
 		return nil
 	}
@@ -182,12 +188,16 @@ func (e *Exec) OpenApp(ctx context.Context, pkgOrLabel string) error {
 			return fmt.Errorf("%q is ambiguous: %s", pkgOrLabel, strings.Join(matches, ", "))
 		}
 	}
-	out, err := e.text(ctx, "monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")
-	if err != nil {
-		return err
-	}
-	if strings.Contains(out, "No activities found") || strings.Contains(out, "monkey aborted") {
+	// /system/bin/monkey has no #! line, so exec fails with ENOEXEC; hand the
+	// script to sh as a file argument (still argv, no -c).
+	out, errOut, err := e.run(ctx, "sh", "/system/bin/monkey", "-p", pkg, "-c", "android.intent.category.LAUNCHER", "1")
+	msg := string(out) + string(errOut)
+	// monkey exits non-zero here; check its message first so the error is readable.
+	if strings.Contains(msg, "No activities found") || strings.Contains(msg, "monkey aborted") {
 		return fmt.Errorf("package %s has no launcher activity or is not installed", pkg)
+	}
+	if err != nil {
+		return fmt.Errorf("monkey: %w: %s", err, firstLine(msg))
 	}
 	return nil
 }

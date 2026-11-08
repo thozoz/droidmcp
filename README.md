@@ -76,6 +76,10 @@ makes every ref stale, and using one returns `stale ref, call ui_tree`.
 - `type_text` handles printable ASCII only.
 - `open_app` by label matches package-name substrings, not real app labels.
 - Display 0 only.
+- `ui_tree` takes 4-10 s (`uiautomator dump` waits for the UI to go idle) and can
+  fail with "could not get idle state" on screens that never settle, such as
+  animated launchers. It also sees only the focused window, not overlays like
+  the notification shade.
 
 ## Daemon flags
 
