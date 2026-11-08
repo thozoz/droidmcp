@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -104,6 +105,14 @@ func run() error {
 	}
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 	link := appLink{pkg: *app, port: port, token: *token, logger: logger}
+	// The user's own "stay awake" developer setting, restored instead of forced
+	// off when we no longer need the screen on.
+	prevStayOn := "0"
+	if out, err := exec.Command("settings", "get", "global", "stay_on_while_plugged_in").Output(); err == nil {
+		if v := strings.TrimSpace(string(out)); v != "" && v != "null" {
+			prevStayOn = v
+		}
+	}
 	setStayOn := func(on bool) {
 		if !*keepAwake {
 			return
@@ -112,7 +121,7 @@ func run() error {
 			_ = exec.Command("svc", "power", "stayon", "true").Run()
 			_ = exec.Command("input", "keyevent", "224").Run() // WAKEUP
 		} else {
-			_ = exec.Command("svc", "power", "stayon", "false").Run()
+			_ = exec.Command("settings", "put", "global", "stay_on_while_plugged_in", prevStayOn).Run()
 		}
 	}
 	defer setStayOn(false)
@@ -142,6 +151,7 @@ func run() error {
 	// exit hard once the deadline passes. The helper dies on socket EOF.
 	time.AfterFunc(shutdownDeadline, func() {
 		logger.Warn("graceful shutdown timed out; exiting")
+		setStayOn(false) // os.Exit skips the deferred restore
 		os.Exit(1)
 	})
 	sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)

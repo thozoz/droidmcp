@@ -10,7 +10,7 @@ import java.io.DataOutputStream
 
 /**
  * Entry point for `app_process -Djava.class.path=<base.apk> /system/bin
- * com.efe.droidmcp.helper.Main <args>`, run as the shell user.
+ * com.thozoz.droidmcp.helper.Main <args>`, run as the shell user.
  *
  *   serve <name>  connect to the daemon's abstract socket @name and serve requests
  *   probe         print what UiAutomation can see, for manual checks

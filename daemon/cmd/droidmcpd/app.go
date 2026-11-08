@@ -13,7 +13,7 @@ import (
 // notification with the Stop (kill switch) action. Everything is best-effort:
 // the daemon works without the app.
 type appLink struct {
-	pkg    string // e.g. com.efe.droidmcp; empty disables the link
+	pkg    string // e.g. com.thozoz.droidmcp; empty disables the link
 	port   string
 	token  string
 	logger *slog.Logger
