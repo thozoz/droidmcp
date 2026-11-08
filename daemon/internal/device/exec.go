@@ -138,19 +138,24 @@ func (e *Exec) Swipe(ctx context.Context, x1, y1, x2, y2, ms int) error {
 	return e.input(ctx, "swipe", strconv.Itoa(x1), strconv.Itoa(y1), strconv.Itoa(x2), strconv.Itoa(y2), strconv.Itoa(ms))
 }
 
-func (e *Exec) TypeText(ctx context.Context, text string, replace bool) error {
+func (e *Exec) TypeText(ctx context.Context, text string, replace, submit bool) error {
 	if replace {
 		_ = e.input(ctx, "keycombination", "113", "29")
 		_ = e.input(ctx, "keyevent", "67")
 	}
-	if text == "" {
-		return nil
+	if text != "" {
+		arg, err := inputTextArg(text)
+		if err != nil {
+			return err
+		}
+		if err := e.input(ctx, "text", arg); err != nil {
+			return err
+		}
 	}
-	arg, err := inputTextArg(text)
-	if err != nil {
-		return err
+	if submit {
+		_ = e.input(ctx, "keyevent", "66") // KEYCODE_ENTER
 	}
-	return e.input(ctx, "text", arg)
+	return nil
 }
 
 // inputTextArg encodes text for `input text`, which turns "%s" into a space

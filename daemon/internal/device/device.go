@@ -17,7 +17,7 @@ type Device interface {
 	Tap(ctx context.Context, x, y int) error
 	LongPress(ctx context.Context, x, y, ms int) error
 	Swipe(ctx context.Context, x1, y1, x2, y2, ms int) error
-	TypeText(ctx context.Context, text string, replace bool) error
+	TypeText(ctx context.Context, text string, replace, submit bool) error
 	Key(ctx context.Context, k Key) error
 	OpenApp(ctx context.Context, pkgOrLabel string) error
 	ListApps(ctx context.Context) ([]App, error)
@@ -29,7 +29,7 @@ type Device interface {
 // directly (accessibility actions) instead of tapping their bounds.
 type NodeActor interface {
 	ClickNode(ctx context.Context, ref string) error
-	SetNodeText(ctx context.Context, ref, text string, replace bool) error
+	SetNodeText(ctx context.Context, ref, text string, replace, submit bool) error
 }
 
 // DisplayInfo describes the display in device pixels, already rotated

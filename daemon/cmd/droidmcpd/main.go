@@ -108,13 +108,15 @@ func run() error {
 		if !*keepAwake {
 			return
 		}
-		val := "false"
 		if on {
-			val = "usb"
+			_ = exec.Command("svc", "power", "stayon", "true").Run()
+			_ = exec.Command("input", "keyevent", "224").Run() // WAKEUP
+		} else {
+			_ = exec.Command("svc", "power", "stayon", "false").Run()
 		}
-		_ = exec.Command("svc", "power", "stayon", val).Run()
 	}
 	defer setStayOn(false)
+	setStayOn(true)
 
 	errc := make(chan error, 1)
 	go func() { errc <- httpSrv.Serve(ln) }()

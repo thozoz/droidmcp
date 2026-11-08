@@ -67,8 +67,8 @@ class Server(
         "swipe" -> { swipe(a.getInt("x1"), a.getInt("y1"), a.getInt("x2"), a.getInt("y2"), a.getLong("ms")); null to null }
         "key" -> { key(a.getString("code")); null to null }
         "click" -> { click(a.getString("ref")); null to null }
-        "set_text" -> { appendText(node(a.getString("ref")), a.optString("text", ""), a.optBoolean("replace", false)); null to null }
-        "type" -> { appendText(findFocusedInput(), a.optString("text", ""), a.optBoolean("replace", false)); null to null }
+        "set_text" -> { appendText(node(a.getString("ref")), a.optString("text", ""), a.optBoolean("replace", false), a.optBoolean("submit", false)); null to null }
+        "type" -> { appendText(findFocusedInput(), a.optString("text", ""), a.optBoolean("replace", false), a.optBoolean("submit", false)); null to null }
         "apps" -> apps() to null
         else -> throw IllegalArgumentException("unknown op $op")
     }
@@ -161,7 +161,7 @@ class Server(
             ?: ua.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
 
     /** ACTION_SET_TEXT replaces; when replace is false, appends to current text. */
-    private fun appendText(n: AccessibilityNodeInfo?, text: String, replace: Boolean = false) {
+    private fun appendText(n: AccessibilityNodeInfo?, text: String, replace: Boolean = false, submit: Boolean = false) {
         if (n != null && n.isEditable) {
             val newText = if (replace) text else {
                 val current = if (n.isShowingHintText) "" else n.text?.toString().orEmpty()
@@ -171,6 +171,7 @@ class Server(
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
             }
             if (n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
+                if (submit) triggerSubmit(n)
                 return
             }
         }
@@ -187,9 +188,42 @@ class Server(
                     key("KEYCODE_DEL")
                 }
             }
+            if (submit) triggerSubmit(n)
             return
         }
         pasteFallback(n, text, replace)
+        if (submit) triggerSubmit(n)
+    }
+
+    private fun triggerSubmit(n: AccessibilityNodeInfo?) {
+        SystemClock.sleep(100) // Brief pause for UI state update after text entry
+
+        fun findSendButton(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+            if (node == null) return null
+            val id = node.viewIdResourceName?.lowercase().orEmpty()
+            val desc = node.contentDescription?.toString()?.lowercase().orEmpty()
+            if (node.isClickable && (id.endsWith(":id/send") || id.contains("send_button") ||
+                    desc == "gönder" || desc == "send" || desc == "ara" || desc == "search")) {
+                return node
+            }
+            for (i in 0 until node.childCount) {
+                val found = findSendButton(node.getChild(i))
+                if (found != null) return found
+            }
+            return null
+        }
+
+        val roots = ua.windows.mapNotNull { it.root }.ifEmpty { listOfNotNull(ua.rootInActiveWindow) }
+        val sendBtn = roots.firstNotNullOfOrNull { findSendButton(it) }
+        if (sendBtn != null && sendBtn.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            return
+        }
+
+        if (n != null && n.performAction(android.R.id.accessibilityActionImeEnter)) {
+            return
+        }
+
+        key("KEYCODE_ENTER")
     }
 
     private fun pasteFallback(n: AccessibilityNodeInfo?, text: String, replace: Boolean = false) {

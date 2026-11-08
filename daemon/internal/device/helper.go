@@ -250,11 +250,11 @@ func (h *Helper) Swipe(ctx context.Context, x1, y1, x2, y2, ms int) error {
 	return err
 }
 
-func (h *Helper) TypeText(ctx context.Context, text string, replace bool) error {
+func (h *Helper) TypeText(ctx context.Context, text string, replace, submit bool) error {
 	if text == "" && !replace {
 		return errors.New("text is empty")
 	}
-	_, err := h.call(ctx, "type", map[string]any{"text": text, "replace": replace}, nil)
+	_, err := h.call(ctx, "type", map[string]any{"text": text, "replace": replace, "submit": submit}, nil)
 	return err
 }
 
@@ -272,8 +272,8 @@ func (h *Helper) ClickNode(ctx context.Context, ref string) error {
 	return err
 }
 
-func (h *Helper) SetNodeText(ctx context.Context, ref, text string, replace bool) error {
-	_, err := h.call(ctx, "set_text", map[string]any{"ref": ref, "text": text, "replace": replace}, nil)
+func (h *Helper) SetNodeText(ctx context.Context, ref, text string, replace, submit bool) error {
+	_, err := h.call(ctx, "set_text", map[string]any{"ref": ref, "text": text, "replace": replace, "submit": submit}, nil)
 	return err
 }
 
