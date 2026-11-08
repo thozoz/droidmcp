@@ -1,1 +1,13 @@
 daemon/bin/
+
+# Android / Gradle (Phase 1)
+build/
+.gradle/
+local.properties
+*.apk
+*.aab
+
+# Signing material: never commit
+*.keystore
+*.jks
+keystore.properties
