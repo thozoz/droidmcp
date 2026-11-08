@@ -70,7 +70,20 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	srv := sdk.NewServer(&sdk.Implementation{Name: "droidmcp", Version: version}, nil)
-	go syncTools(ctx, srv, up)
+
+	// Fetch tools synchronously if phone is already reachable so client gets them on initial tools/list.
+	initCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	tools, err := up.tools(initCtx)
+	cancel()
+	if err == nil {
+		for _, t := range tools {
+			srv.AddTool(t, forward(up, t))
+		}
+		log.Printf("connected; %d tools", len(tools))
+	} else {
+		go syncTools(ctx, srv, up)
+	}
+
 	if err := srv.Run(ctx, &sdk.StdioTransport{}); err != nil && ctx.Err() == nil {
 		log.Fatal(err)
 	}
