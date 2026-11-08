@@ -1,4 +1,4 @@
-package com.efe.droidmcp.app
+package com.thozoz.droidmcp.app
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -18,6 +18,11 @@ object Notifications {
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "Daemon status", NotificationManager.IMPORTANCE_LOW)
         )
+        val open = PendingIntent.getActivity(
+            context, 0,
+            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
         val stop = PendingIntent.getBroadcast(
             context, 0,
             Intent(context, StopReceiver::class.java),
@@ -26,6 +31,7 @@ object Notifications {
         val n = Notification.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setContentTitle("droidmcp is running")
+            .setContentIntent(open)
             .setContentText(
                 when (clients) {
                     0 -> "No clients · port $port"

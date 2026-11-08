@@ -11,11 +11,11 @@ val keystoreFile = rootProject.file("keystore.properties")
 val keystore = Properties().apply { if (keystoreFile.exists()) keystoreFile.inputStream().use { load(it) } }
 
 android {
-    namespace = "com.efe.droidmcp"
+    namespace = "com.thozoz.droidmcp"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.efe.droidmcp"
+        applicationId = "com.thozoz.droidmcp"
         minSdk = 30
         targetSdk = 36
         // CI passes these from the release tag (v1.2.3 -> 1.2.3).

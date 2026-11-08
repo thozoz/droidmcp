@@ -1,4 +1,4 @@
-package com.efe.droidmcp.app
+package com.thozoz.droidmcp.app
 
 import android.Manifest
 import android.app.Activity
@@ -13,7 +13,7 @@ import android.widget.Button
 import android.widget.Switch
 import android.widget.TextView
 import android.widget.Toast
-import com.efe.droidmcp.R
+import com.thozoz.droidmcp.R
 import org.json.JSONObject
 import java.time.Duration
 import java.time.Instant
@@ -44,12 +44,15 @@ class MainActivity : Activity() {
 
         val lan = findViewById<Switch>(R.id.lan)
         val shell = findViewById<Switch>(R.id.shell)
+        val keepAwake = findViewById<Switch>(R.id.keepAwake)
         lan.isChecked = Daemon.lan(this)
         shell.isChecked = Daemon.shell(this)
+        keepAwake.isChecked = Daemon.keepAwake(this)
         lan.setOnCheckedChangeListener { _, on ->
             if (on) confirmLan(lan) else saveOptions()
         }
         shell.setOnCheckedChangeListener { _, _ -> saveOptions() }
+        keepAwake.setOnCheckedChangeListener { _, _ -> saveOptions() }
 
         if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
@@ -138,7 +141,8 @@ class MainActivity : Activity() {
     private fun saveOptions() {
         val lan = findViewById<Switch>(R.id.lan).isChecked
         val shell = findViewById<Switch>(R.id.shell).isChecked
-        io.execute { Daemon.setOptions(this, lan, shell) }
+        val keepAwake = findViewById<Switch>(R.id.keepAwake).isChecked
+        io.execute { Daemon.setOptions(this, lan, shell, keepAwake) }
         if (running) toast("Applies when the daemon is next started")
     }
 

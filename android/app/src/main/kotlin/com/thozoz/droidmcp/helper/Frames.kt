@@ -1,4 +1,4 @@
-package com.efe.droidmcp.helper
+package com.thozoz.droidmcp.helper
 
 import java.io.DataInputStream
 import java.io.DataOutputStream

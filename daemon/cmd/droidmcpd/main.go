@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/exec"
 	"os/signal"
 	"syscall"
 	"time"
@@ -38,6 +39,7 @@ func run() error {
 	tokenFile := flag.String("token-file", "/data/local/tmp/droidmcp.token", "file the token is written to (0600)")
 	maxEdge := flag.Int("max-edge", 1080, "long edge of screenshot space in px; all tool coordinates use this space")
 	enableShell := flag.Bool("enable-shell", false, "expose the shell tool")
+	keepAwake := flag.Bool("keep-awake", true, "keep screen awake while clients are active")
 	app := flag.String("app", "", "companion app package to notify (kill-switch notification); empty disables")
 	apk := flag.String("apk", "", "path to the droidmcp APK; enables the UiAutomation helper backend (otherwise shell tools)")
 	flag.Parse()
@@ -102,6 +104,18 @@ func run() error {
 	}
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 	link := appLink{pkg: *app, port: port, token: *token, logger: logger}
+	setStayOn := func(on bool) {
+		if !*keepAwake {
+			return
+		}
+		val := "false"
+		if on {
+			val = "usb"
+		}
+		_ = exec.Command("svc", "power", "stayon", val).Run()
+	}
+	defer setStayOn(false)
+
 	errc := make(chan error, 1)
 	go func() { errc <- httpSrv.Serve(ln) }()
 	link.started()
@@ -109,7 +123,9 @@ func run() error {
 	go tracker.Run(ctx)
 	go func() {
 		for range clientsChanged {
-			link.clients(len(tracker.Active()))
+			n := len(tracker.Active())
+			link.clients(n)
+			setStayOn(n > 0)
 		}
 	}()
 	logger.Info("listening", "addr", *addr, "version", version, "token_file", *tokenFile, "shell", *enableShell, "helper", *apk != "")

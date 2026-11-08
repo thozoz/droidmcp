@@ -1,4 +1,4 @@
-package com.efe.droidmcp.app
+package com.thozoz.droidmcp.app
 
 import android.content.Context
 import android.net.ConnectivityManager

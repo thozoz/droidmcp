@@ -1,4 +1,4 @@
-package com.efe.droidmcp.app
+package com.thozoz.droidmcp.app
 
 import android.app.Application
 import android.util.Log
@@ -51,7 +51,7 @@ class DroidMcpApp : Application() {
     }
 
     companion object {
-        const val START_COMMAND = "adb shell sh /sdcard/Android/data/com.efe.droidmcp/files/start.sh"
-        const val BRIDGE_DIR = "/sdcard/Android/data/com.efe.droidmcp/files/bridge"
+        const val START_COMMAND = "adb shell sh /sdcard/Android/data/com.thozoz.droidmcp/files/start.sh"
+        const val BRIDGE_DIR = "/sdcard/Android/data/com.thozoz.droidmcp/files/bridge"
     }
 }

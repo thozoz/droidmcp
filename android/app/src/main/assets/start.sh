@@ -1,12 +1,12 @@
 #!/system/bin/sh
 # Starts the droidmcp daemon as the shell user. Run it from a computer:
 #
-#   adb shell sh /sdcard/Android/data/com.efe.droidmcp/files/start.sh [daemon flags]
+#   adb shell sh /sdcard/Android/data/com.thozoz.droidmcp/files/start.sh [daemon flags]
 #
 # e.g. -enable-shell, -addr 0.0.0.0:8765 (LAN). The app rewrites this file on
 # every launch, so it always matches the installed version.
 
-PKG=com.efe.droidmcp
+PKG=com.thozoz.droidmcp
 # Options chosen in the app (LAN access, shell tool); written by the app only.
 FLAGS=$(cat "$(dirname "$0")/flags" 2>/dev/null)
 LOG=/data/local/tmp/droidmcpd.log

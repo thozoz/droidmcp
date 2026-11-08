@@ -1,4 +1,4 @@
-package com.efe.droidmcp.app
+package com.thozoz.droidmcp.app
 
 import android.content.Context
 import org.json.JSONArray
@@ -9,9 +9,9 @@ import java.net.URL
 
 /** What the app knows about the daemon: where it listens, its token, and start options. */
 object Daemon {
-    const val ACTION_STARTED = "com.efe.droidmcp.DAEMON_STARTED"
-    const val ACTION_STOPPED = "com.efe.droidmcp.DAEMON_STOPPED"
-    const val ACTION_CLIENTS = "com.efe.droidmcp.DAEMON_CLIENTS"
+    const val ACTION_STARTED = "com.thozoz.droidmcp.DAEMON_STARTED"
+    const val ACTION_STOPPED = "com.thozoz.droidmcp.DAEMON_STOPPED"
+    const val ACTION_CLIENTS = "com.thozoz.droidmcp.DAEMON_CLIENTS"
     const val EXTRA_CLIENTS = "clients"
     const val EXTRA_PORT = "port"
     const val EXTRA_TOKEN = "token"
@@ -19,6 +19,7 @@ object Daemon {
 
     private const val KEY_LAN = "lan"
     private const val KEY_SHELL = "shell"
+    private const val KEY_KEEP_AWAKE = "keep_awake"
 
     private fun prefs(context: Context) = context.getSharedPreferences("daemon", Context.MODE_PRIVATE)
 
@@ -43,16 +44,22 @@ object Daemon {
 
     fun lan(context: Context) = prefs(context).getBoolean(KEY_LAN, false)
     fun shell(context: Context) = prefs(context).getBoolean(KEY_SHELL, false)
+    fun keepAwake(context: Context) = prefs(context).getBoolean(KEY_KEEP_AWAKE, true)
 
     /**
      * Saves start options and writes them as daemon flags next to start.sh,
      * which reads them on the next start. Only these known flags are written.
      */
-    fun setOptions(context: Context, lan: Boolean, shell: Boolean) {
-        prefs(context).edit().putBoolean(KEY_LAN, lan).putBoolean(KEY_SHELL, shell).apply()
+    fun setOptions(context: Context, lan: Boolean, shell: Boolean, keepAwake: Boolean) {
+        prefs(context).edit()
+            .putBoolean(KEY_LAN, lan)
+            .putBoolean(KEY_SHELL, shell)
+            .putBoolean(KEY_KEEP_AWAKE, keepAwake)
+            .apply()
         val flags = buildList {
             if (lan) add("-addr 0.0.0.0:$DEFAULT_PORT")
             if (shell) add("-enable-shell")
+            if (!keepAwake) add("-keep-awake=false")
         }.joinToString(" ")
         val dir = context.getExternalFilesDir(null) ?: return
         File(dir, "flags").writeText(flags + "\n")

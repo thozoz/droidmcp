@@ -10,7 +10,7 @@
                                          │ internal/mcp    tools, refs, screenshot space
                                          │ internal/device Device interface
                                          │   ├─ Helper ── abstract unix socket ──▶ app_process
-                                         │   │                                     com.efe.droidmcp.helper.Main
+                                         │   │                                     com.thozoz.droidmcp.helper.Main
                                          │   │                                     (UiAutomation, shell uid)
                                          │   └─ Exec   (Phase 0: screencap/uiautomator/input)
                                          └─ am broadcast ──▶ app (notification, Stop, UI)

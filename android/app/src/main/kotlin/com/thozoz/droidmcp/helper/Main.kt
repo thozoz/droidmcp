@@ -1,4 +1,4 @@
-package com.efe.droidmcp.helper
+package com.thozoz.droidmcp.helper
 
 import android.net.LocalSocket
 import android.net.LocalSocketAddress

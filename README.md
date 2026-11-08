@@ -29,7 +29,7 @@ adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 Open **droidmcp** on the phone once (it writes `start.sh`), then:
 
 ```sh
-adb shell sh /sdcard/Android/data/com.efe.droidmcp/files/start.sh
+adb shell sh /sdcard/Android/data/com.thozoz.droidmcp/files/start.sh
 ```
 
 The easiest way to connect: tap **Copy setup prompt** in the app and paste it
@@ -41,7 +41,7 @@ computer from the phone and register it by absolute path:
 
 ```sh
 mkdir -p ~/.droidmcp
-adb pull /sdcard/Android/data/com.efe.droidmcp/files/bridge/droidmcp-bridge-darwin-arm64 ~/.droidmcp/droidmcp-bridge
+adb pull /sdcard/Android/data/com.thozoz.droidmcp/files/bridge/droidmcp-bridge-darwin-arm64 ~/.droidmcp/droidmcp-bridge
 chmod +x ~/.droidmcp/droidmcp-bridge     # not on Windows (keep the .exe name there)
 claude mcp add android -- ~/.droidmcp/droidmcp-bridge
 ```
