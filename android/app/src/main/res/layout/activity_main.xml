@@ -38,6 +38,30 @@
             style="@style/Body"
             android:text="An MCP server that lets an AI agent see and operate this phone. It runs as the adb shell user, started from a computer." />
 
+        <!-- Connect an AI -->
+        <LinearLayout style="@style/Section">
+
+            <TextView style="@style/Label" android:text="CONNECT AN AI" />
+
+            <TextView
+                style="@style/Body"
+                android:text="Copy a setup prompt and paste it into your AI agent (e.g. Claude Code). It connects itself to this phone." />
+
+            <TextView
+                android:id="@+id/promptMode"
+                style="@style/Body" />
+
+            <Button
+                android:id="@+id/copyPrompt"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="@color/accent"
+                android:text="Copy setup prompt"
+                android:textAllCaps="false"
+                android:textColor="@color/bg" />
+        </LinearLayout>
+
         <!-- Start -->
         <LinearLayout style="@style/Section">
 
@@ -98,6 +122,20 @@
             <TextView
                 style="@style/Body"
                 android:text="Anyone with the token can control this phone. A new token is made on every start; Regenerate replaces it while running." />
+        </LinearLayout>
+
+        <!-- Clients -->
+        <LinearLayout style="@style/Section">
+
+            <TextView style="@style/Label" android:text="CLIENTS · LAST 2 MINUTES" />
+
+            <TextView
+                android:id="@+id/clients"
+                style="@style/Mono" />
+
+            <TextView
+                style="@style/Body"
+                android:text="Sources that made MCP calls with the token. Over USB every client is 127.0.0.1 (adb). An address you don't recognize means the token leaked: Regenerate it, then Stop." />
         </LinearLayout>
 
         <!-- Options -->

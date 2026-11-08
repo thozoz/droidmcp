@@ -4,6 +4,8 @@
     <!-- Loopback HTTP to the daemon's /shutdown endpoint. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Wi-Fi address for the LAN setup prompt. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
         android:name=".app.DroidMcpApp"

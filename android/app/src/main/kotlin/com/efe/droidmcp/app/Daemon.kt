@@ -1,6 +1,7 @@
 package com.efe.droidmcp.app
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -10,6 +11,8 @@ import java.net.URL
 object Daemon {
     const val ACTION_STARTED = "com.efe.droidmcp.DAEMON_STARTED"
     const val ACTION_STOPPED = "com.efe.droidmcp.DAEMON_STOPPED"
+    const val ACTION_CLIENTS = "com.efe.droidmcp.DAEMON_CLIENTS"
+    const val EXTRA_CLIENTS = "clients"
     const val EXTRA_PORT = "port"
     const val EXTRA_TOKEN = "token"
     const val DEFAULT_PORT = 8765
@@ -26,6 +29,17 @@ object Daemon {
 
     fun port(context: Context): Int = prefs(context).getInt(EXTRA_PORT, DEFAULT_PORT)
     fun token(context: Context): String? = prefs(context).getString(EXTRA_TOKEN, null)
+
+    fun clientCount(context: Context) = prefs(context).getInt(EXTRA_CLIENTS, 0)
+    fun setClientCount(context: Context, n: Int) = prefs(context).edit().putInt(EXTRA_CLIENTS, n).apply()
+
+    /** Active clients from GET /clients (addr, via, requests, last). Call off the main thread. */
+    fun clients(context: Context): List<JSONObject> {
+        val (code, body) = request(context, "GET", "/clients") ?: return emptyList()
+        if (code != 200 || body.isBlank() || body.trim() == "null") return emptyList()
+        val arr = JSONArray(body)
+        return (0 until arr.length()).map { arr.getJSONObject(it) }
+    }
 
     fun lan(context: Context) = prefs(context).getBoolean(KEY_LAN, false)
     fun shell(context: Context) = prefs(context).getBoolean(KEY_SHELL, false)

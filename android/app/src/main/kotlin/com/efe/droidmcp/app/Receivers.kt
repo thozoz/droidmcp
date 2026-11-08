@@ -11,7 +11,13 @@ class StatusReceiver : BroadcastReceiver() {
             Daemon.ACTION_STARTED -> {
                 val port = intent.getIntExtra(Daemon.EXTRA_PORT, Daemon.DEFAULT_PORT)
                 intent.getStringExtra(Daemon.EXTRA_TOKEN)?.let { Daemon.remember(context, port, it) }
-                Notifications.showRunning(context, port)
+                Daemon.setClientCount(context, 0)
+                Notifications.showRunning(context, port, 0)
+            }
+            Daemon.ACTION_CLIENTS -> {
+                val n = intent.getIntExtra(Daemon.EXTRA_CLIENTS, 0)
+                Daemon.setClientCount(context, n)
+                Notifications.showRunning(context, Daemon.port(context), n)
             }
             Daemon.ACTION_STOPPED -> Notifications.cancel(context)
         }

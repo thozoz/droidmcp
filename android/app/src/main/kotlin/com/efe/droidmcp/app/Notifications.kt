@@ -12,7 +12,8 @@ object Notifications {
     private const val CHANNEL = "daemon"
     private const val ID = 1
 
-    fun showRunning(context: Context, port: Int) {
+    /** Short on purpose: the client count is what to glance at (an unexpected extra client = leaked token). */
+    fun showRunning(context: Context, port: Int, clients: Int) {
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL, "Daemon status", NotificationManager.IMPORTANCE_LOW)
@@ -25,7 +26,14 @@ object Notifications {
         val n = Notification.Builder(context, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_manage)
             .setContentTitle("droidmcp is running")
-            .setContentText("An AI agent can control this phone (port $port)")
+            .setContentText(
+                when (clients) {
+                    0 -> "No clients · port $port"
+                    1 -> "1 client · port $port"
+                    else -> "$clients clients · port $port"
+                }
+            )
+            .setOnlyAlertOnce(true)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, "Stop", stop).build())
             .build()
