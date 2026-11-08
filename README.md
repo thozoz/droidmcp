@@ -81,6 +81,11 @@ to touching the node's bounds.
 
 Known gaps: display 0 only.
 
+**Clipboard:** when a field refuses `ACTION_SET_TEXT`, `type_text` falls back to
+putting the text on the clipboard and pasting it. This **replaces whatever was
+on your clipboard**, and it cannot be restored: since Android 10 the shell user
+cannot read the clipboard, so the previous content is lost.
+
 ## Stopping
 
 - The **Stop** button in the app or in the notification.

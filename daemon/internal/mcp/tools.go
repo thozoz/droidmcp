@@ -80,7 +80,7 @@ func (t *tools) register(s *sdk.Server, enableShell bool) {
 	sdk.AddTool(s, &sdk.Tool{Name: "long_press", Description: "Long-press a node (ref) or a point (x,y)." + coordNote}, t.longPress)
 	sdk.AddTool(s, &sdk.Tool{Name: "swipe", Description: "Swipe from (x1,y1) to (x2,y2)." + coordNote}, t.swipe)
 	sdk.AddTool(s, &sdk.Tool{Name: "scroll", Description: "Scroll a scrollable node, or the whole screen." + coordNote}, t.scroll)
-	sdk.AddTool(s, &sdk.Tool{Name: "type_text", Description: "Type text into a field (ref) or the focused field; appends by default, or replaces/clears with replace:true. The exec fallback backend accepts printable ASCII only."}, t.typeText)
+	sdk.AddTool(s, &sdk.Tool{Name: "type_text", Description: "Type text into a field (ref) or the focused field; appends by default, or replaces/clears with replace:true. If the field refuses direct text setting, the text is pasted via the clipboard, which overwrites the user's clipboard content (it cannot be restored). The exec fallback backend accepts printable ASCII only."}, t.typeText)
 	sdk.AddTool(s, &sdk.Tool{Name: "key", Description: "Press a system key."}, t.key)
 	sdk.AddTool(s, &sdk.Tool{Name: "open_app", Description: "Launch an app by package name or app label."}, t.openApp)
 	sdk.AddTool(s, &sdk.Tool{Name: "list_apps", Annotations: ro, Description: "List launchable apps with their labels and package names."}, t.listApps)
