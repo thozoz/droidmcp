@@ -34,6 +34,7 @@ func run() error {
 	tokenFile := flag.String("token-file", "/data/local/tmp/droidmcp.token", "file the token is written to (0600)")
 	maxEdge := flag.Int("max-edge", 1080, "long edge of screenshot space in px; all tool coordinates use this space")
 	enableShell := flag.Bool("enable-shell", false, "expose the shell tool")
+	apk := flag.String("apk", "", "path to the droidmcp APK; enables the UiAutomation helper backend (otherwise shell tools)")
 	flag.Parse()
 
 	// Must survive the adb session ending (USB unplug, wireless debugging off).
@@ -57,7 +58,13 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	srv := mcp.NewServer(device.NewExec(), mcp.Options{
+	var dev device.Device = device.NewExec()
+	if *apk != "" {
+		h := device.NewHelper(*apk)
+		defer h.Close()
+		dev = h
+	}
+	srv := mcp.NewServer(dev, mcp.Options{
 		MaxEdge: *maxEdge, EnableShell: *enableShell, Version: version, Logger: logger,
 	})
 	httpSrv := &http.Server{
@@ -68,7 +75,7 @@ func run() error {
 
 	errc := make(chan error, 1)
 	go func() { errc <- httpSrv.ListenAndServe() }()
-	logger.Info("listening", "addr", *addr, "version", version, "token_file", *tokenFile, "shell", *enableShell)
+	logger.Info("listening", "addr", *addr, "version", version, "token_file", *tokenFile, "shell", *enableShell, "helper", *apk != "")
 
 	select {
 	case err := <-errc:

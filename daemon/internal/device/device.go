@@ -25,6 +25,13 @@ type Device interface {
 	Shell(ctx context.Context, cmd string) (string, error)
 }
 
+// NodeActor is implemented by backends that can act on ui_tree nodes
+// directly (accessibility actions) instead of tapping their bounds.
+type NodeActor interface {
+	ClickNode(ctx context.Context, ref string) error
+	SetNodeText(ctx context.Context, ref, text string) error
+}
+
 // DisplayInfo describes the display in device pixels, already rotated
 // (Width/Height are as currently seen on screen).
 type DisplayInfo struct {

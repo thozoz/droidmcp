@@ -10,6 +10,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	"github.com/thozoz/droidmcp/daemon/internal/device"
+	"github.com/thozoz/droidmcp/daemon/internal/ipc"
 )
 
 const coordNote = " All coordinates are in screenshot space (the space of screenshot/ui_tree output); the server converts them to device pixels."
@@ -77,7 +78,7 @@ func (t *tools) register(s *sdk.Server, enableShell bool) {
 	sdk.AddTool(s, &sdk.Tool{Name: "long_press", Description: "Long-press a node (ref) or a point (x,y)." + coordNote}, t.longPress)
 	sdk.AddTool(s, &sdk.Tool{Name: "swipe", Description: "Swipe from (x1,y1) to (x2,y2)." + coordNote}, t.swipe)
 	sdk.AddTool(s, &sdk.Tool{Name: "scroll", Description: "Scroll a scrollable node, or the whole screen." + coordNote}, t.scroll)
-	sdk.AddTool(s, &sdk.Tool{Name: "type_text", Description: "Type text, optionally tapping a field (ref) first. Exec backend: printable ASCII only."}, t.typeText)
+	sdk.AddTool(s, &sdk.Tool{Name: "type_text", Description: "Type text into a field (ref) or the focused field; appends to existing text. The exec fallback backend accepts printable ASCII only."}, t.typeText)
 	sdk.AddTool(s, &sdk.Tool{Name: "key", Description: "Press a system key."}, t.key)
 	sdk.AddTool(s, &sdk.Tool{Name: "open_app", Description: "Launch an app by package or label."}, t.openApp)
 	sdk.AddTool(s, &sdk.Tool{Name: "list_apps", Annotations: ro, Description: "List installed third-party packages."}, t.listApps)
@@ -189,7 +190,44 @@ func (t *tools) point(in pointIn) (int, int, error) {
 	return x, y, nil
 }
 
+// nodeAction tries an accessibility action on a ref'd node. It reports false
+// when the caller should fall back to touching the node's bounds: no ref, a
+// backend without node actions, or the app declining the action. Transport
+// errors are returned, never retried as a touch, since the action may have run.
+func (t *tools) nodeAction(in string, eligible bool, act func(device.NodeActor, string) error) (bool, error) {
+	actor, ok := t.dev.(device.NodeActor)
+	if in == "" || !ok || !eligible {
+		return false, nil
+	}
+	n, _, err := t.state.resolve(in)
+	if err != nil {
+		return false, nil // the caller's own resolve reports it
+	}
+	err = act(actor, n.Ref)
+	var remote *ipc.RemoteError
+	if errors.As(err, &remote) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
 func (t *tools) tap(ctx context.Context, _ *sdk.CallToolRequest, in pointIn) (*sdk.CallToolResult, any, error) {
+	clickable := false
+	if in.Ref != "" {
+		n, _, err := t.state.resolve(in.Ref)
+		if err != nil {
+			return nil, nil, err
+		}
+		clickable = n.Clickable
+	}
+	done, err := t.nodeAction(in.Ref, clickable, func(a device.NodeActor, ref string) error { return a.ClickNode(ctx, ref) })
+	if done || err != nil {
+		t.state.bump()
+		if err != nil {
+			return nil, nil, err
+		}
+		return text("ok (accessibility click)"), nil, nil
+	}
 	x, y, err := t.point(in)
 	if err != nil {
 		return nil, nil, err
@@ -281,6 +319,14 @@ func scrollVector(b device.Bounds, dir string) (x1, y1, x2, y2 int, err error) {
 }
 
 func (t *tools) typeText(ctx context.Context, _ *sdk.CallToolRequest, in typeTextIn) (*sdk.CallToolResult, any, error) {
+	done, err := t.nodeAction(in.Ref, true, func(a device.NodeActor, ref string) error { return a.SetNodeText(ctx, ref, in.Text) })
+	if done || err != nil {
+		t.state.bump()
+		if err != nil {
+			return nil, nil, err
+		}
+		return text("ok"), nil, nil
+	}
 	if in.Ref != "" {
 		n, _, err := t.state.resolve(in.Ref)
 		if err != nil {
