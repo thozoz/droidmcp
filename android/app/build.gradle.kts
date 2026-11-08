@@ -21,6 +21,14 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            // The daemon ships as lib/arm64-v8a/libdroidmcpd.so; it must be extracted
+            // to nativeLibraryDir (not left compressed in the APK) to be exec-able.
+            useLegacyPackaging = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

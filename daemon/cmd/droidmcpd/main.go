@@ -8,6 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,6 +35,7 @@ func run() error {
 	tokenFile := flag.String("token-file", "/data/local/tmp/droidmcp.token", "file the token is written to (0600)")
 	maxEdge := flag.Int("max-edge", 1080, "long edge of screenshot space in px; all tool coordinates use this space")
 	enableShell := flag.Bool("enable-shell", false, "expose the shell tool")
+	app := flag.String("app", "", "companion app package to notify (kill-switch notification); empty disables")
 	apk := flag.String("apk", "", "path to the droidmcp APK; enables the UiAutomation helper backend (otherwise shell tools)")
 	flag.Parse()
 
@@ -73,8 +75,16 @@ func run() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	ln, err := net.Listen("tcp", *addr)
+	if err != nil {
+		return err
+	}
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	link := appLink{pkg: *app, port: port, token: *token, logger: logger}
 	errc := make(chan error, 1)
-	go func() { errc <- httpSrv.ListenAndServe() }()
+	go func() { errc <- httpSrv.Serve(ln) }()
+	link.started()
+	defer link.stopped()
 	logger.Info("listening", "addr", *addr, "version", version, "token_file", *tokenFile, "shell", *enableShell, "helper", *apk != "")
 
 	select {
