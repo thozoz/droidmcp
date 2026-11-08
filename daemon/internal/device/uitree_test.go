@@ -103,4 +103,3 @@ func TestDisplayScale(t *testing.T) {
 		t.Errorf("must not upscale, got %v", s)
 	}
 }
-
