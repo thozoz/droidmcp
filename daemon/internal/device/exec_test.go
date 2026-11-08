@@ -119,6 +119,9 @@ func TestUITreeReadsDump(t *testing.T) {
 	if len(nodes) != 5 || d != (DisplayInfo{Width: 2400, Height: 1080, Rotation: 1}) {
 		t.Errorf("nodes=%d display=%+v", len(nodes), d)
 	}
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("dump file left on disk: %v", err)
+	}
 }
 
 func TestParsers(t *testing.T) {

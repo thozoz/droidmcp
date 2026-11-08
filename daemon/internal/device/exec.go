@@ -91,6 +91,7 @@ func (e *Exec) UITree(ctx context.Context, interactiveOnly bool) ([]Node, Displa
 		return nil, DisplayInfo{}, err
 	}
 	data, err := os.ReadFile(e.dumpPath)
+	_ = os.Remove(e.dumpPath) // holds all on-screen text (messages etc.); don't leave it on disk
 	if err != nil {
 		return nil, DisplayInfo{}, fmt.Errorf("read ui dump: %w", err)
 	}
