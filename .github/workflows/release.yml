@@ -1,0 +1,65 @@
+name: Release
+
+# Push a tag like v0.2.0 to build the APK and publish it as a GitHub Release.
+# Signing uses repository secrets when present:
+#   KEYSTORE_BASE64   base64 of the release .jks
+#   KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+# Without them the release carries a debug-signed APK.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: daemon/go.mod
+          cache-dependency-path: daemon/go.sum
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-36 build-tools;36.0.0
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Signing config
+        id: sign
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "variant=debug" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/release.jks
+          printf 'storeFile=release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" > android/keystore.properties
+          echo "variant=release" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        env:
+          ORG_GRADLE_PROJECT_versionName: ${{ github.ref_name }}
+          ORG_GRADLE_PROJECT_versionCode: ${{ github.run_number }}
+        run: |
+          export ORG_GRADLE_PROJECT_versionName="${ORG_GRADLE_PROJECT_versionName#v}"
+          sh scripts/build-apk.sh ${{ steps.sign.outputs.variant }}
+          mkdir -p dist
+          cp android/app/build/outputs/apk/${{ steps.sign.outputs.variant }}/*.apk "dist/droidmcp-${{ github.ref_name }}.apk"
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" dist/*.apk --title "${{ github.ref_name }}" --generate-notes
