@@ -17,9 +17,14 @@ class DroidMcpApp : Application() {
     private fun writeStartScript() {
         val dir = getExternalFilesDir(null) ?: return
         runCatching {
-            assets.open("start.sh").use { input ->
-                File(dir, "start.sh").outputStream().use { input.copyTo(it) }
-            }
+            val script = assets.open("start.sh").use { it.readBytes() }
+            val target = File(dir, "start.sh")
+            if (target.exists() && target.readBytes().contentEquals(script)) return
+            // The daemon's STARTED broadcast launches this process while start.sh is
+            // still running; sh reads scripts incrementally, so never rewrite in place.
+            val tmp = File(dir, "start.sh.tmp")
+            tmp.writeBytes(script)
+            if (!tmp.renameTo(target)) error("rename failed")
         }.onFailure { Log.w("droidmcp", "could not write start.sh", it) }
     }
 

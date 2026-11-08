@@ -7,6 +7,8 @@
 # every launch, so it always matches the installed version.
 
 PKG=com.efe.droidmcp
+# Options chosen in the app (LAN access, shell tool); written by the app only.
+FLAGS=$(cat "$(dirname "$0")/flags" 2>/dev/null)
 LOG=/data/local/tmp/droidmcpd.log
 TOKEN_FILE=/data/local/tmp/droidmcp.token
 
@@ -36,7 +38,7 @@ done
 rm -f "$TOKEN_FILE"
 
 # setsid: keep running after the adb session ends (USB unplugged, wireless debugging off).
-setsid "$BIN" -apk "$PKG" -app "$PKG" -token-file "$TOKEN_FILE" "$@" </dev/null >"$LOG" 2>&1 &
+setsid "$BIN" -apk "$PKG" -app "$PKG" -token-file "$TOKEN_FILE" $FLAGS "$@" </dev/null >"$LOG" 2>&1 &
 
 for _ in 1 2 3 4 5 6 7 8 9 10; do
     [ -s "$TOKEN_FILE" ] && break

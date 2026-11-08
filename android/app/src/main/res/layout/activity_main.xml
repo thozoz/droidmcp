@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:fontFamily="monospace"
+                android:text="droidmcp"
+                android:textColor="@color/text"
+                android:textSize="22sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="monospace"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <TextView
+            style="@style/Body"
+            android:text="An MCP server that lets an AI agent see and operate this phone. It runs as the adb shell user, started from a computer." />
+
+        <!-- Start -->
+        <LinearLayout style="@style/Section">
+
+            <TextView style="@style/Label" android:text="START (FROM A COMPUTER)" />
+
+            <TextView
+                android:id="@+id/command"
+                style="@style/Mono" />
+
+            <Button
+                android:id="@+id/copyCommand"
+                style="@style/TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Copy command" />
+
+            <TextView
+                style="@style/Body"
+                android:text="Then connect your MCP client through droidmcp-bridge, which forwards the port and reads the token over adb." />
+        </LinearLayout>
+
+        <!-- Token -->
+        <LinearLayout style="@style/Section">
+
+            <TextView style="@style/Label" android:text="TOKEN" />
+
+            <TextView
+                android:id="@+id/token"
+                style="@style/Mono" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/revealToken"
+                    style="@style/TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Show" />
+
+                <Button
+                    android:id="@+id/copyToken"
+                    style="@style/TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Copy" />
+
+                <Button
+                    android:id="@+id/rotateToken"
+                    style="@style/TextButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Regenerate" />
+            </LinearLayout>
+
+            <TextView
+                style="@style/Body"
+                android:text="Anyone with the token can control this phone. A new token is made on every start; Regenerate replaces it while running." />
+        </LinearLayout>
+
+        <!-- Options -->
+        <LinearLayout style="@style/Section">
+
+            <TextView style="@style/Label" android:text="OPTIONS · APPLIED ON NEXT START" />
+
+            <Switch
+                android:id="@+id/lan"
+                style="@style/Toggle"
+                android:layout_marginTop="8dp"
+                android:text="Allow LAN access" />
+
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="0dp"
+                android:text="Listens on all interfaces instead of 127.0.0.1. Traffic is plain HTTP: anyone on the same network can read the token. Trusted networks only." />
+
+            <Switch
+                android:id="@+id/shell"
+                style="@style/Toggle"
+                android:layout_marginTop="12dp"
+                android:text="Enable shell tool" />
+
+            <TextView
+                style="@style/Body"
+                android:layout_marginTop="0dp"
+                android:text="Lets the agent run any command as the shell user." />
+        </LinearLayout>
+
+        <!-- Stop -->
+        <LinearLayout style="@style/Section">
+
+            <Button
+                android:id="@+id/stop"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:backgroundTint="@color/danger"
+                android:text="Stop daemon"
+                android:textAllCaps="false"
+                android:textColor="@color/bg" />
+
+            <TextView
+                style="@style/Body"
+                android:text="Stop asks the daemon to exit. If it does not respond, run: adb shell pkill -x libdroidmcpd.so, or reboot the phone. Turning off USB debugging does not stop it." />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
