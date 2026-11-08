@@ -20,6 +20,8 @@ import (
 	"github.com/thozoz/droidmcp/daemon/internal/mcp"
 )
 
+const shutdownDeadline = 3 * time.Second
+
 var version = "dev" // set with -ldflags "-X main.version=..."
 
 func main() {
@@ -93,7 +95,13 @@ func run() error {
 	case <-ctx.Done():
 	}
 	logger.Info("shutting down")
-	sctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	// The kill switch must win even if a helper call is stuck holding its lock:
+	// exit hard once the deadline passes. The helper dies on socket EOF.
+	time.AfterFunc(shutdownDeadline, func() {
+		logger.Warn("graceful shutdown timed out; exiting")
+		os.Exit(1)
+	})
+	sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(sctx); err != nil && !errors.Is(err, context.DeadlineExceeded) {
 		return err

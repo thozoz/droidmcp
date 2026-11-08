@@ -47,6 +47,19 @@ Stop it:
 curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:8765/shutdown
 ```
 
+### If Stop does not work
+
+The notification's **Stop** button (and `/shutdown`) *asks* the daemon to
+exit; an ordinary app cannot kill a process owned by the shell user. The
+daemon exits within 3 seconds of the request even if a helper call is stuck,
+but if the process is frozen entirely, use one of these:
+
+- `adb shell pkill -x libdroidmcpd.so` (Phase 0 binary: `adb shell pkill -x droidmcpd`)
+- **Reboot the phone.** The daemon never starts on its own after a reboot.
+
+Turning off USB or wireless debugging does **not** stop it: it is detached
+with `setsid` so it outlives the adb session by design.
+
 ## Tools
 
 All coordinates (inputs and `ui_tree` bounds) are in **screenshot space**: the
