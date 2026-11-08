@@ -1,64 +1,48 @@
 # droidmcp
 
 An MCP server that runs **on** an Android phone and lets an AI agent drive it:
-screenshot, read the UI tree, tap/swipe/type, press system keys, open apps.
-Browser automation, but for Android, with no PC in the control loop.
+screenshot, read the UI tree of every window, tap/swipe/type (any language),
+press system keys, open apps. Browser automation, but for Android.
 
-The daemon is written in Go and runs as the shell user (uid 2000), the same
-privilege level `adb shell` has. It speaks MCP over Streamable HTTP and every
-request needs a bearer token.
+- The **daemon** (Go) runs as the shell user (uid 2000), the privilege level
+  `adb shell` has, and speaks MCP over Streamable HTTP with a bearer token.
+- A **helper** (Kotlin, started by the daemon with `app_process`) does the
+  work through `UiAutomation`: screenshots, accessibility tree, input injection.
+- The **app** shows the start command, token, options and a Stop button, and
+  posts a persistent notification with a kill switch while the daemon runs.
+- The **bridge** (Go, on your computer) is what your MCP client launches. It
+  owns the adb plumbing so the client's connection never drops.
 
-> **Status: Phase 0.** A Go binary pushed to `/data/local/tmp`, backed by stock
-> tools (`screencap`, `uiautomator`, `input`, `monkey`). Phase 1 replaces the
-> backend with a UiAutomation helper inside an APK; the tool interface stays the
-> same. See [ARCHITECTURE.md](ARCHITECTURE.md).
+See [ARCHITECTURE.md](ARCHITECTURE.md) for how the pieces fit.
 
-## Quick start (Phase 0)
+## Quick start
 
-Requirements: Go 1.26+, `adb`, a phone with USB debugging on (on MIUI, also
+Requirements: Go 1.26+, JDK 17+, Android SDK (platform 36), `adb`, and an
+arm64 phone on Android 11+ with USB debugging enabled (on MIUI/HyperOS also
 "USB debugging (Security settings)").
 
 ```sh
-sh scripts/build-phase0.sh   # -> daemon/bin/droidmcpd-arm64
-sh scripts/run-phase0.sh     # push, start detached, adb forward, print the next command
+sh scripts/build-apk.sh                            # Go daemon -> APK
+adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-`run-phase0.sh` ends by printing something like:
+Open **droidmcp** on the phone once (it writes `start.sh`), then:
 
 ```sh
-claude mcp add --transport http android http://127.0.0.1:8765/mcp --header "Authorization: Bearer <token>"
+adb shell sh /sdcard/Android/data/com.efe.droidmcp/files/start.sh
 ```
 
-Run that, start Claude Code, and ask it to take a screenshot.
-
-Manual steps, if you'd rather not use the script:
+Install the bridge and register it with your MCP client, e.g. Claude Code:
 
 ```sh
-adb push daemon/bin/droidmcpd-arm64 /data/local/tmp/droidmcpd
-adb shell chmod 755 /data/local/tmp/droidmcpd
-adb shell "setsid /data/local/tmp/droidmcpd </dev/null >/data/local/tmp/droidmcpd.log 2>&1 &"
-adb shell cat /data/local/tmp/droidmcp.token
-adb forward tcp:8765 tcp:8765
+cd daemon && go install ./cmd/droidmcp-bridge
+claude mcp add android -- droidmcp-bridge
 ```
 
-Stop it:
-
-```sh
-curl -X POST -H "Authorization: Bearer <token>" http://127.0.0.1:8765/shutdown
-```
-
-### If Stop does not work
-
-The notification's **Stop** button (and `/shutdown`) *asks* the daemon to
-exit; an ordinary app cannot kill a process owned by the shell user. The
-daemon exits within 3 seconds of the request even if a helper call is stuck,
-but if the process is frozen entirely, use one of these:
-
-- `adb shell pkill -x libdroidmcpd.so` (Phase 0 binary: `adb shell pkill -x droidmcpd`)
-- **Reboot the phone.** The daemon never starts on its own after a reboot.
-
-Turning off USB or wireless debugging does **not** stop it: it is detached
-with `setsid` so it outlives the adb session by design.
+The bridge waits for the phone, runs `adb forward`, and reads the daemon's
+token over adb, refetching it after a daemon restart or token rotation.
+Unplugging the cable is fine: the daemon keeps running, and the bridge
+reconnects when the phone is back. Several phones: `droidmcp-bridge -serial <id>`.
 
 ## Tools
 
@@ -73,48 +57,56 @@ converts them to device pixels.
 | `tap`, `long_press` | `ref` or `x`,`y`; `duration_ms` for long_press |
 | `swipe` | `x1`,`y1`,`x2`,`y2`, `duration_ms` |
 | `scroll` | `direction` (up/down/left/right), optional `ref` |
-| `type_text` | `text`, optional `ref` to tap first |
+| `type_text` | `text`, optional `ref`; appends to the field's text |
 | `key` | home, back, recents, enter, wake, power, volume_up, volume_down |
 | `open_app` | `package` or `label` |
 | `list_apps`, `current_app` | none |
 | `wait_for` | `text` or `ref`, `timeout_ms` |
-| `shell` | `cmd`; only registered with `-enable-shell` |
+| `shell` | `cmd`; only with the shell option enabled |
 
-A ref belongs to one snapshot. Any screen-changing tool (tap, swipe, key, ...)
-makes every ref stale, and using one returns `stale ref, call ui_tree`.
+A ref belongs to one snapshot. Any screen-changing tool makes every ref stale;
+using one returns `stale ref, call ui_tree`. `tap` and `type_text` with a ref
+use the accessibility action (`ACTION_CLICK`, `ACTION_SET_TEXT`) and fall back
+to touching the node's bounds.
 
-### Phase 0 limitations
+Known gaps: `open_app` by label matches package names, not app labels; fields
+that refuse `ACTION_SET_TEXT` have no clipboard fallback yet; display 0 only.
 
-- `webp` returns an error (the Go standard library has no WebP encoder).
-- `type_text` handles printable ASCII only.
-- `open_app` by label matches package-name substrings, not real app labels.
-- Display 0 only.
-- `ui_tree` takes 4-10 s (`uiautomator dump` waits for the UI to go idle) and can
-  fail with "could not get idle state" on screens that never settle, such as
-  animated launchers. It also sees only the focused window, not overlays like
-  the notification shade.
+## Stopping
 
-## Daemon flags
+- The **Stop** button in the app or in the notification.
+- `adb shell pkill -x libdroidmcpd.so`
+- **Reboot.** The daemon never starts on its own.
 
-| flag | default | |
-|---|---|---|
-| `-addr` | `127.0.0.1:8765` | Keep loopback unless you want LAN access |
-| `-token` | random | Bearer token |
-| `-token-file` | `/data/local/tmp/droidmcp.token` | Written with mode 0600 |
-| `-max-edge` | `1080` | Defines screenshot space |
-| `-enable-shell` | `false` | Exposes the `shell` tool |
+Stop *asks* the daemon to exit (an app cannot kill a shell-user process); the
+daemon exits within 3 seconds even if a helper call is stuck. Turning off USB
+or wireless debugging does **not** stop it: it is detached with `setsid` by
+design.
 
 ## Security
 
-- Binds to loopback by default; reach it through `adb forward`.
-- A random 256-bit bearer token is required on every endpoint, compared in constant time.
-- The `shell` tool is off unless explicitly enabled.
-- Anyone holding the token can fully control the phone. Treat it like a password.
+- Binds to `127.0.0.1`; reach it through `adb forward` (the bridge does this).
+- A random 256-bit bearer token guards every endpoint, compared in constant
+  time. A new token is made on each start; the app can rotate it.
+- The token reaches the app only through a broadcast that only the shell can
+  send (the receiver requires `DUMP`), and the bridge reads it over adb. It is
+  never written to shared storage.
+- The helper's socket is an abstract unix socket; the daemon accepts only its
+  own child (SO_PEERCRED: uid 2000 and the spawned pid).
+- The `shell` tool is off unless enabled in the app.
+- **LAN access** (off by default, confirmation required) serves plain HTTP:
+  anyone on the same network can read the token and fully control the phone.
+  Use it only on networks you trust. TLS with certificate pinning in the
+  bridge is a possible next step.
+
+Anyone holding the token controls the phone. Treat it like a password.
 
 ## Development
 
 ```sh
-cd daemon
-go vet ./...
-go test ./...
+cd daemon && go vet ./... && go test ./...      # unit tests (auth, ui tree, ipc, helper restarts, bridge)
+cd android && ./gradlew :app:assembleDebug
 ```
+
+`scripts/build-phase0.sh` and `scripts/run-phase0.sh` still build and run the
+APK-less Phase 0 daemon (stock `screencap`/`uiautomator`/`input` backend).
