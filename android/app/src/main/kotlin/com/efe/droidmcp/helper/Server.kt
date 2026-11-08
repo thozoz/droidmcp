@@ -1,7 +1,12 @@
 package com.efe.droidmcp.helper
 
 import android.app.UiAutomation
+import android.content.ClipData
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.Bundle
 import android.os.SystemClock
 import android.view.InputDevice
@@ -14,7 +19,6 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
-import android.graphics.Rect
 
 /**
  * Serves daemon requests one at a time. Each request is
@@ -64,7 +68,8 @@ class Server(
         "key" -> { key(a.getString("code")); null to null }
         "click" -> { click(a.getString("ref")); null to null }
         "set_text" -> { appendText(node(a.getString("ref")), a.getString("text")); null to null }
-        "type" -> { appendText(focusedInput(), a.getString("text")); null to null }
+        "type" -> { appendText(findFocusedInput(), a.getString("text")); null to null }
+        "apps" -> apps() to null
         else -> throw IllegalArgumentException("unknown op $op")
     }
 
@@ -151,22 +156,81 @@ class Server(
         }
     }
 
-    private fun focusedInput(): AccessibilityNodeInfo =
+    private fun findFocusedInput(): AccessibilityNodeInfo? =
         ua.windows.firstNotNullOfOrNull { it.root?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) }
             ?: ua.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: throw IllegalStateException("no focused text field; pass a ref or tap a field first")
 
     /** ACTION_SET_TEXT replaces, so keep what is already typed (unless it is only a hint). */
-    private fun appendText(n: AccessibilityNodeInfo, text: String) {
-        if (!n.isEditable) throw IllegalStateException("node is not an editable text field")
-        val current = if (n.isShowingHintText) "" else n.text?.toString().orEmpty()
-        val args = Bundle().apply {
-            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, current + text)
+    private fun appendText(n: AccessibilityNodeInfo?, text: String) {
+        if (n != null && n.isEditable) {
+            val current = if (n.isShowingHintText) "" else n.text?.toString().orEmpty()
+            val args = Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, current + text)
+            }
+            if (n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
+                return
+            }
         }
-        // shortcut: no clipboard+paste fallback yet; fields that refuse SET_TEXT fail here.
-        if (!n.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
-            throw IllegalStateException("field refused ACTION_SET_TEXT")
+        // SET_TEXT was refused or node not directly settable: fall back to clipboard + paste.
+        pasteFallback(n, text)
+    }
+
+    private fun pasteFallback(n: AccessibilityNodeInfo?, text: String) {
+        val prevClip = Clipboard.getPrimaryClip()
+        val clip = ClipData.newPlainText("text", text)
+        if (!Clipboard.setPrimaryClip(clip)) {
+            throw IllegalStateException("clipboard set failed for paste fallback")
         }
+        try {
+            if (n != null) {
+                val len = n.text?.length ?: 0
+                if (len > 0) {
+                    val selArgs = Bundle().apply {
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, len)
+                        putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, len)
+                    }
+                    n.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, selArgs)
+                }
+                if (!n.performAction(AccessibilityNodeInfo.ACTION_PASTE)) {
+                    key("KEYCODE_PASTE")
+                }
+            } else {
+                key("KEYCODE_PASTE")
+            }
+        } finally {
+            if (prevClip != null) {
+                SystemClock.sleep(50)
+                Clipboard.setPrimaryClip(prevClip)
+            }
+        }
+    }
+
+    private val pm: PackageManager by lazy {
+        val atCls = Class.forName("android.app.ActivityThread")
+        val systemMain = atCls.getDeclaredMethod("systemMain").invoke(null)
+        val ctx = atCls.getDeclaredMethod("getSystemContext").invoke(systemMain) as Context
+        ctx.packageManager
+    }
+
+    private fun apps(): JSONObject {
+        val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val activities = pm.queryIntentActivities(intent, 0)
+        val out = JSONArray()
+        val seen = HashSet<String>()
+        for (ri in activities) {
+            val ai = ri.activityInfo ?: continue
+            val pkg = ai.packageName
+            val label = ri.loadLabel(pm)?.toString().orEmpty()
+            val key = "$pkg|$label"
+            if (!seen.add(key)) continue
+            out.put(
+                JSONObject()
+                    .put("package", pkg)
+                    .put("activity", ai.name)
+                    .put("label", label)
+            )
+        }
+        return JSONObject().put("apps", out)
     }
 
     private fun inject(ev: InputEvent, sync: Boolean = true) {
