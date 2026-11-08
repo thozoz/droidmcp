@@ -98,7 +98,7 @@ func (e *Exec) UITree(ctx context.Context, interactiveOnly bool) ([]Node, Displa
 	if err != nil {
 		return nil, DisplayInfo{}, err
 	}
-	d, err := e.display(ctx)
+	d, err := e.Display(ctx)
 	return nodes, d, err
 }
 
@@ -229,8 +229,8 @@ func (e *Exec) Shell(ctx context.Context, cmd string) (string, error) {
 	return combined, nil
 }
 
-// display returns the current display size (rotated) and rotation.
-func (e *Exec) display(ctx context.Context) (DisplayInfo, error) {
+// Display returns the current display size (rotated) and rotation.
+func (e *Exec) Display(ctx context.Context) (DisplayInfo, error) {
 	out, err := e.text(ctx, "wm", "size")
 	if err != nil {
 		return DisplayInfo{}, err

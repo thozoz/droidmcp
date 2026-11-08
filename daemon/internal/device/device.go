@@ -13,6 +13,7 @@ import (
 type Device interface {
 	Screenshot(ctx context.Context, opts ScreenshotOpts) (Screenshot, error)
 	UITree(ctx context.Context, interactiveOnly bool) ([]Node, DisplayInfo, error)
+	Display(ctx context.Context) (DisplayInfo, error)
 	Tap(ctx context.Context, x, y int) error
 	LongPress(ctx context.Context, x, y, ms int) error
 	Swipe(ctx context.Context, x1, y1, x2, y2, ms int) error
