@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
+        android:name=".app.DroidMcpApp"
         android:allowBackup="false"
         android:label="droidmcp"
         android:networkSecurityConfig="@xml/network_security_config">

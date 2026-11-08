@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -47,13 +48,28 @@ var (
 	_ NodeActor = (*Helper)(nil)
 )
 
-// NewHelper runs the helper from apk with app_process.
+// NewHelper runs the helper with app_process from apk, which is either a
+// path or a package name. A package is resolved with `pm path` on every
+// start, so updating the app does not leave the daemon with a stale path.
 func NewHelper(apk string) *Helper {
-	return &Helper{Exec: NewExec(), spawn: appProcessSpawner(apk), now: time.Now}
+	e := NewExec()
+	return &Helper{Exec: e, spawn: appProcessSpawner(e, apk), now: time.Now}
 }
 
-func appProcessSpawner(apk string) spawnFunc {
+func appProcessSpawner(e *Exec, apk string) spawnFunc {
 	return func(ctx context.Context) (io.ReadWriteCloser, func(), error) {
+		path := apk
+		if !strings.HasPrefix(apk, "/") {
+			out, err := e.text(ctx, "pm", "path", apk)
+			if err != nil {
+				return nil, nil, err
+			}
+			p, ok := baseAPK(out)
+			if !ok {
+				return nil, nil, fmt.Errorf("package %s is not installed", apk)
+			}
+			path = p
+		}
 		var b [8]byte
 		_, _ = rand.Read(b[:])
 		name := "droidmcp-" + hex.EncodeToString(b[:])
@@ -63,7 +79,7 @@ func appProcessSpawner(apk string) spawnFunc {
 		}
 		defer l.Close()
 
-		cmd := exec.Command("app_process", "-Djava.class.path="+apk, "/system/bin",
+		cmd := exec.Command("app_process", "-Djava.class.path="+path, "/system/bin",
 			"com.efe.droidmcp.helper.Main", "serve", name)
 		cmd.Stdout, cmd.Stderr = os.Stderr, os.Stderr // helper logs land in the daemon log
 		if err := cmd.Start(); err != nil {
@@ -259,4 +275,22 @@ func (h *Helper) ClickNode(ctx context.Context, ref string) error {
 func (h *Helper) SetNodeText(ctx context.Context, ref, text string) error {
 	_, err := h.call(ctx, "set_text", map[string]string{"ref": ref, "text": text}, nil)
 	return err
+}
+
+// baseAPK picks the base APK from `pm path` output (split APKs add more lines).
+func baseAPK(out string) (string, bool) {
+	var first string
+	for line := range strings.Lines(out) {
+		p, ok := strings.CutPrefix(strings.TrimSpace(line), "package:")
+		if !ok {
+			continue
+		}
+		if strings.HasSuffix(p, "/base.apk") {
+			return p, true
+		}
+		if first == "" {
+			first = p
+		}
+	}
+	return first, first != ""
 }

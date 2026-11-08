@@ -131,3 +131,16 @@ func TestHelperRestartLimit(t *testing.T) {
 		t.Fatalf("after window: %v", err)
 	}
 }
+
+func TestBaseAPK(t *testing.T) {
+	split := "package:/data/app/x/split_config.arm64_v8a.apk\npackage:/data/app/x/base.apk\n"
+	if p, ok := baseAPK(split); !ok || p != "/data/app/x/base.apk" {
+		t.Errorf("split: %q %v", p, ok)
+	}
+	if p, ok := baseAPK("package:/data/app/y/app.apk\r\n"); !ok || p != "/data/app/y/app.apk" {
+		t.Errorf("single: %q %v", p, ok)
+	}
+	if _, ok := baseAPK(""); ok {
+		t.Error("empty output must not resolve")
+	}
+}
